@@ -2,7 +2,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bet } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
-import { Zap, Wallet, Target, Trophy } from "lucide-react";
+import { Wallet, Target } from "lucide-react";
 
 interface StatsCardsProps {
     bets: Bet[];
@@ -12,7 +12,6 @@ export function StatsCards({ bets }: StatsCardsProps) {
     // Calculate stats
     // Filter for finished bets for profit/win rate
     const finishedBets = bets.filter(b => b.status === "finished");
-    const activeBets = bets.filter(b => ["placed", "ready", "analyzed"].includes(b.status));
 
     // Calculate Total Profit (Realized Returns - Stake)
     // This depends on how we store historical data. 

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Bet, approveBetIntent } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
@@ -41,6 +41,7 @@ export function BetApprovalInterface({ bets }: BetApprovalInterfaceProps) {
     const [approving, setApproving] = useState<string | null>(null);
     const [isExpanded, setIsExpanded] = useState(true);
     const [editedStakes, setEditedStakes] = useState<Record<string, Record<string, number>>>({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [modifiedSelections, setModifiedSelections] = useState<Record<string, any[]>>({});
     const [removedOriginalItems, setRemovedOriginalItems] = useState<Record<string, Set<number>>>({});
     const [addMarketDialogOpen, setAddMarketDialogOpen] = useState(false);
@@ -121,6 +122,7 @@ export function BetApprovalInterface({ bets }: BetApprovalInterfaceProps) {
         }));
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const addMarket = (betId: string, eventName: string, market: any, selection: any) => {
         const newMarket = {
             event: eventName,
@@ -141,6 +143,7 @@ export function BetApprovalInterface({ bets }: BetApprovalInterfaceProps) {
         setAddMarketDialogOpen(false);
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const addMatch = (betId: string, event: any, market: any, selection: any) => {
         const newMarket = {
             event: event.event_name,
@@ -238,6 +241,7 @@ export function BetApprovalInterface({ bets }: BetApprovalInterfaceProps) {
 
                             // Group selections by event (removed useMemo to fix hook rendering error)
                             const groups: Record<string, GroupedSelection> = {};
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             items.forEach((item: any) => {
                                 const eventName = item.event || "Unknown Event";
                                 if (!groups[eventName]) {
@@ -264,14 +268,12 @@ export function BetApprovalInterface({ bets }: BetApprovalInterfaceProps) {
                             // Calculate totals with edited stakes
                             let totalStake = 0;
                             let totalReturns = 0;
-                            let combinedOdds = 0;
 
                             groupedSelections.forEach(group => {
                                 group.markets.forEach(market => {
                                     const stake = getStake(bet.id, market.stableId, market.stake);
                                     totalStake += stake;
                                     totalReturns += stake * market.odds;
-                                    combinedOdds += market.odds;
                                 });
                             });
 
@@ -303,12 +305,6 @@ export function BetApprovalInterface({ bets }: BetApprovalInterfaceProps) {
 
                                         {/* Grouped Selections by Event */}
                                         {groupedSelections.map((group, groupIdx) => {
-                                            let currentMarketIndex = 0;
-                                            // Calculate the starting index for this group
-                                            for (let i = 0; i < groupIdx; i++) {
-                                                currentMarketIndex += groupedSelections[i].markets.length;
-                                            }
-
                                             return (
                                                 <div key={groupIdx} className="space-y-2">
                                                     <div className="flex items-center justify-between">
@@ -334,10 +330,12 @@ export function BetApprovalInterface({ bets }: BetApprovalInterfaceProps) {
                                                                     <DialogTitle>Add Market to {group.event}</DialogTitle>
                                                                 </DialogHeader>
                                                                 <div className="space-y-4 py-4 overflow-y-auto max-h-[60vh]">
+                                                                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                                                                     {bet.events?.find((e: any) => e.event_name === group.event)?.options?.map((option: any, idx: number) => (
                                                                         <div key={idx} className="space-y-2">
                                                                             <p className="font-semibold text-sm">{option.name}</p>
                                                                             <div className="space-y-1">
+                                                                                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                                                                                 {option.options?.map((selection: any, selIdx: number) => (
                                                                                     <Button
                                                                                         key={selIdx}
@@ -430,19 +428,24 @@ export function BetApprovalInterface({ bets }: BetApprovalInterfaceProps) {
                                                     <DialogTitle>Select a Match to Add</DialogTitle>
                                                 </DialogHeader>
                                                 <div className="space-y-4 py-4 overflow-y-auto max-h-[60vh]">
+                                                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                                                     {bet.events?.filter((e: any) => !groupedSelections.some(g => g.event === e.event_name)).length === 0 ? (
                                                         <p className="text-sm text-gray-500 text-center py-8">All available matches have been added</p>
                                                     ) : (
                                                         bet.events
+                                                            /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
                                                             ?.filter((e: any) => !groupedSelections.some(g => g.event === e.event_name))
+                                                            /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
                                                             .map((event: any, eventIdx: number) => (
                                                                 <div key={eventIdx} className="border rounded-sm p-3 space-y-2">
                                                                     <p className="font-semibold text-sm">{event.event_name}</p>
                                                                     <p className="text-xs text-gray-500">{event.competition_name} • {new Date(event.event_time).toLocaleString()}</p>
+                                                                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                                                                     {event.options?.map((option: any, optIdx: number) => (
                                                                         <div key={optIdx} className="space-y-2">
                                                                             <p className="text-xs text-gray-600">{option.name}</p>
                                                                             <div className="grid grid-cols-2 gap-2">
+                                                                                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                                                                                 {option.options?.map((selection: any, selIdx: number) => (
                                                                                     <Button
                                                                                         key={selIdx}
