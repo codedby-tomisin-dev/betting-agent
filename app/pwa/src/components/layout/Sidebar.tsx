@@ -1,12 +1,10 @@
 import Link from "next/link";
-import { LayoutDashboard, Zap, History, TrendingUp, Settings, Bot } from "lucide-react";
+import { LayoutDashboard, History, Settings, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
     { name: "Dashboard", href: "/", icon: LayoutDashboard },
-    { name: "Active Bets", href: "/#active-bets", icon: Zap },
     { name: "Bet History", href: "/#history", icon: History },
-    { name: "Performance", href: "/#performance", icon: TrendingUp },
     { name: "Settings", href: "/settings", icon: Settings },
 ];
 
@@ -21,7 +19,6 @@ export function Sidebar() {
                 <Bot className="h-8 w-8 text-green-500 mr-2" />
                 <div>
                     <h1 className="text-lg font-bold leading-none">BetAgent</h1>
-                    <p className="text-xs text-gray-400">AI Betting Assistant</p>
                 </div>
             </div>
 

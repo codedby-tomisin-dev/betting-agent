@@ -545,8 +545,10 @@ class BettingManager:
                     update_data = {
                         "settlement_results": merged_results,
                         "last_settled_at": admin_firestore.SERVER_TIMESTAMP,
-                        "balance.ending": starting_balance + total_realized_profit,
-                        "realized_returns": total_realized_profit
+                        "balance": {
+                            **bet_doc.get("balance", {}),
+                            "ending": starting_balance + total_realized_profit,
+                        }
                     }
                     
                     if is_finished:

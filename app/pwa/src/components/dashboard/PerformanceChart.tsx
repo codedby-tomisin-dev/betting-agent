@@ -16,15 +16,22 @@ export function PerformanceChart({ bets }: PerformanceChartProps) {
         .filter(b => b.status === "finished" && b.balance?.ending !== undefined)
         .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
         .map(b => ({
-            date: format(new Date(b.created_at || b.target_date), "MMM d"), // simple date format
+            date: format(new Date(b.target_date), "d MMM yyyy"),
             balance: b.balance?.ending
         }));
 
-    // If no data, show some placeholder or empty state
-    if (data.length === 0) {
+    // If data exists, prepend a starting point
+    if (data.length > 0) {
+        // Use a date slightly before the first bet, or just label it "Start"
+        // To keep X-Axis consistent (if it's parsing dates), we might need a valid date string.
+        // But for "d MMM yyyy", "Start" won't parse well if we used date objects.
+        // Since we are using formatted strings, "Start" is fine as a categorical label if XAxis allows.
+        // However, Recharts categorical axis works best.
+        // Let's try prepending a point.
+        data.unshift({ date: "Start", balance: 0 });
+    } else {
         // Mock data for visualization if empty
-        // data.push({ date: 'Jan 1', balance: 1000 });
-        // data.push({ date: 'Jan 2', balance: 1050 });
+        data.push({ date: 'Start', balance: 0 });
     }
 
     return (

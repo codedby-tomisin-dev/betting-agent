@@ -15,16 +15,16 @@ AUTOMATED_BETTING_OPTIONS = {
 # Reliable teams by competition (competitions derived from keys at runtime)
 RELIABLE_TEAMS = {
     "English Premier League": [
-        "Manchester City",      # CL winners + dominant EPL over last cycles
+        "Man City",      # CL winners + dominant EPL over last cycles
         "Liverpool",            # Regular top-4 + European deep runs
         "Arsenal",              # Sustained top-tier performance
         "Chelsea",              # Still strong enough for top markets
-        "Manchester United",
+        "Man Utd",
         "Aston Villa"
     ],
 
     "FA Cup": [
-        "Manchester City",      # CL winners + dominant EPL over last cycles
+        "Man City",      # CL winners + dominant EPL over last cycles
         "Arsenal",              # Sustained top-tier performance
         "Aston Villa",
         "Brentford",
@@ -55,8 +55,8 @@ RELIABLE_TEAMS = {
 
     "UEFA Champions League": [
         "Real Madrid",          # Record CL winners & top UEFA coefficient
-        "Manchester City",      # Champions League winners recently
-        "Paris Saint-Germain",  # CL winners + elite squad value
+        "Man City",      # Champions League winners recently
+        "PSG",  # CL winners + elite squad value
         "Bayern Munich",        # Regular deep runs & domestic dominance
         "Liverpool",            # Frequent deep CL knockout presence
         "Inter Milan",          # Strong continental coefficient presence

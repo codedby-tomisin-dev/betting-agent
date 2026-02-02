@@ -34,7 +34,6 @@ cors_options = CorsOptions(
 
 @scheduler_fn.on_schedule(
     schedule='0 10 * * *',
-    timezone='Europe/London',
     memory=MemoryOption.GB_1,
     timeout_sec=300
 )
@@ -275,7 +274,7 @@ def place_bet_on_ready(event: firestore_fn.Event[firestore_fn.Change[firestore_f
             pass
 
 
-@scheduler_fn.on_schedule(schedule='*/2 * * * *', timezone='Europe/London')
+@scheduler_fn.on_schedule(schedule='*/2 * * * *')
 def on_schedule_example(event: scheduler_fn.ScheduledEvent) -> None:
     print(f"This will be run every hour using {event}")
 
@@ -431,7 +430,7 @@ def check_bet_results(req: https_fn.Request) -> https_fn.Response:
         return make_error_response(str(e))
 
 
-@scheduler_fn.on_schedule(schedule='0 */2 * * *', timezone='Europe/London', timeout_sec=300, memory=options.MemoryOption.GB_1)
+@scheduler_fn.on_schedule(schedule='0 */2 * * *', timeout_sec=300, memory=options.MemoryOption.GB_1)
 def automated_check_bet_results(event: scheduler_fn.ScheduledEvent) -> None:
     """
     Automated scheduler to check bet results every 2 hours.

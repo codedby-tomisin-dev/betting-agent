@@ -3,6 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bet } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
 import { Wallet, Target } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { hack_simulateSuccessfulBet } from "@/lib/hacks";
 
 interface StatsCardsProps {
     bets: Bet[];
@@ -43,31 +45,43 @@ export function StatsCards({ bets }: StatsCardsProps) {
     const currentBalance = latestBet?.balance?.ending ?? latestBet?.balance?.starting ?? 0;
 
     return (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Balance</CardTitle>
-                    <Wallet className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-4xl font-bold">{formatCurrency(currentBalance)}</div>
-                    <p className="text-xs text-muted-foreground">
-                        +{formatCurrency(totalProfit)}
-                    </p>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Win Rate</CardTitle>
-                    <Target className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-3xl font-bold">{winRate.toFixed(1)}%</div>
-                    <p className="text-xs text-muted-foreground">
-                        {wins} wins / {finishedBets.length} placed
-                    </p>
-                </CardContent>
-            </Card>
+        <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Total Balance</CardTitle>
+                        <Wallet className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-4xl font-bold">{formatCurrency(currentBalance)}</div>
+                        <p className="text-xs text-muted-foreground">
+                            +{formatCurrency(totalProfit)}
+                        </p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Win Rate</CardTitle>
+                        <Target className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-3xl font-bold">{winRate.toFixed(1)}%</div>
+                        <p className="text-xs text-muted-foreground">
+                            {wins} wins / {finishedBets.length} placed
+                        </p>
+                    </CardContent>
+                </Card>
+            </div>
+            {/* <div className="mt-4 flex justify-end">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs text-muted-foreground border-dashed"
+                    onClick={() => hack_simulateSuccessfulBet()}
+                >
+                    [DEV] Force Settle Bet
+                </Button>
+            </div> */}
         </div>
     );
 }

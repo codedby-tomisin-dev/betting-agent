@@ -30,9 +30,9 @@ if (typeof window !== "undefined") {
 
 const db = getFirestore(app);
 
-if (process.env.NODE_ENV === 'development') {
-    connectFirestoreEmulator(db, 'localhost', 8080);
-    connectFunctionsEmulator(functions, "localhost", 5001);
-}
+// if (process.env.NODE_ENV === 'development') {
+//     connectFirestoreEmulator(db, 'localhost', 8080);
+//     connectFunctionsEmulator(functions, "localhost", 5001);
+// }
 
 export { app, analytics, db, functions };
