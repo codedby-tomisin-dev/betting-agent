@@ -77,7 +77,7 @@ export async function hack_simulateSuccessfulBet(betId: string = "hHp4wVJ1empws7
             ...(!betData.placement_results ? {
                 placement_results: {
                     status: "success",
-                    bets: items.map((item: any) => ({
+                    bets: items.map((item: { market_id: string, selection_id: string }) => ({
                         bet_id: "simulated_" + Math.random().toString(36),
                         market_id: item.market_id,
                         selection_id: item.selection_id,
@@ -99,8 +99,6 @@ export async function hack_simulateSuccessfulBet(betId: string = "hHp4wVJ1empws7
     }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getTotalStake(items: any[]) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return items.reduce((sum: number, item: any) => sum + (item.stake || 0), 0);
+function getTotalStake(items: { stake: number }[]) {
+    return items.reduce((sum: number, item: { stake: number }) => sum + (item.stake || 0), 0);
 }
