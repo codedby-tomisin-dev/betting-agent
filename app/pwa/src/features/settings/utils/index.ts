@@ -1,0 +1,1 @@
+export { resolveRiskAppetiteLabel } from './resolveRiskAppetiteLabel';

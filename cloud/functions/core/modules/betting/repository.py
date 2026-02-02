@@ -1,16 +1,17 @@
 from typing import Dict, List, Any, Optional
 
 from core import logger
-from core.firestore import get_collection, admin_firestore
+from core.firestore import admin_firestore
+from core.modules.shared.repository import BaseRepository
 
 
-class BetRepository:
+class BetRepository(BaseRepository):
     """Repository for managing bet documents in Firestore."""
     
     COLLECTION_NAME = "bet_slips"
     
     def __init__(self):
-        self.collection = get_collection(self.COLLECTION_NAME)
+        super().__init__(self.COLLECTION_NAME)
 
     def create_bet_intent(self, intent_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -27,7 +28,7 @@ class BetRepository:
             if "created_at" not in intent_data:
                 intent_data["created_at"] = admin_firestore.SERVER_TIMESTAMP
                 
-            update_time, doc_ref = self.collection.add(intent_data)
+            update_time, doc_ref = self.add(intent_data)
             
             logger.info(f"Created bet intent document: {doc_ref.id}")
             
@@ -54,8 +55,7 @@ class BetRepository:
             merge: Whether to merge with existing data (default: True)
         """
         try:
-            doc_ref = self.collection.document(bet_id)
-            doc_ref.set(data, merge=merge)
+            self.set(bet_id, data, merge=merge)
             logger.info(f"Updated bet {bet_id}")
         except Exception as e:
             logger.error(f"Error updating bet {bet_id}: {e}")
@@ -72,14 +72,10 @@ class BetRepository:
             The bet document data or None if not found
         """
         try:
-            doc = self.collection.document(bet_id).get()
-            if not doc.exists:
+            result = self.get(bet_id)
+            if not result:
                 logger.warning(f"Bet {bet_id} not found")
-                return None
-                
-            data = doc.to_dict()
-            data["id"] = doc.id
-            return data
+            return result
             
         except Exception as e:
             logger.error(f"Error retrieving bet {bet_id}: {e}")

@@ -425,23 +425,23 @@ class BettingManager:
         self.repo.update_bet(bet_id, update_data)
         logger.info(f"Updated bet {bet_id} with analysis results")
 
-    def approve_bet_intent(self, bet_id: str, modifications: Optional[Dict[str, Any]] = None) -> None:
+    def approve_bet_intent(self, bet_id: str, selections: Optional[Dict[str, Any]] = None) -> None:
         """
         Approves a bet intent, changing status to 'ready' for placement.
-        Modifications should be in selections format if provided.
+        selections: Optional updated selections data.
         """
         update_data = {
             "status": "ready",
             "approved_at": admin_firestore.SERVER_TIMESTAMP,
         }
 
-        if modifications is not None:
+        if selections is not None:
             # Get current bet to access starting balance
             bet_data = self.repo.get_bet(bet_id)
             starting_balance = bet_data.get("balance", {}).get("starting", 0)
             
             # Extract items from selections format
-            items = modifications.get("items", [])
+            items = selections.get("items", [])
             
             # Recalculate totals from items to ensure consistency
             total_stake = sum(item.get("stake", 0) for item in items)

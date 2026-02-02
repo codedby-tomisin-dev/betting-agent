@@ -1,6 +1,6 @@
 "use client";
 
-import { ConfigurationPanel } from "@/components/betting/ConfigurationPanel";
+import { SettingsContainer } from "@/features/settings";
 
 export default function SettingsPage() {
     return (
@@ -10,7 +10,7 @@ export default function SettingsPage() {
                 <p className="text-gray-500">Configure your AI betting agent parameters</p>
             </div>
 
-            <ConfigurationPanel />
+            <SettingsContainer />
         </div>
     );
 }

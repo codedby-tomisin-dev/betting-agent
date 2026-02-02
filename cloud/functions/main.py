@@ -11,7 +11,9 @@ from core import logger
 from core.firestore import get_document
 from core.modules.betting.manager import BettingManager
 from core.modules.betting.models import AnalyzeBetsRequest, GetOddsRequest, PlaceBetRequest
+from typing import Any
 from core.modules.betting.repository import BetRepository
+from core.modules.settings.manager import SettingsManager
 from utils.responses import make_error_response, make_success_response
 from constants import AUTOMATED_BETTING_OPTIONS, RELIABLE_TEAMS
 
@@ -136,14 +138,14 @@ def approve_bet_intent(req: https_fn.Request) -> https_fn.Response:
     """
     data = req.get_json()['data']
     bet_id = data.get("bet_id")
-    modifications = data.get("modifications")
+    selections = data.get("selections")
 
     if not bet_id:
         return make_error_response("bet_id is required", status=400)
 
     try:
         manager = BettingManager()
-        manager.approve_bet_intent(bet_id, modifications)
+        manager.approve_bet_intent(bet_id, selections)
         return make_success_response({"status": "approved", "bet_id": bet_id})
     except Exception as e:
         logger.error(f"Error approving bet intent: {e}", exc_info=True)
@@ -442,3 +444,22 @@ def automated_check_bet_results(event: scheduler_fn.ScheduledEvent) -> None:
         logger.info("Automated bet results check completed")
     except Exception as e:
         logger.error(f"Error in automated bet results check: {e}", exc_info=True)
+
+
+@https_fn.on_call(timeout_sec=60, memory=options.MemoryOption.GB_1)
+def save_settings(req: https_fn.CallableRequest) -> Any:
+    """
+    Save application settings.
+    Expects data in the request.data dictionary.
+    """
+    try:
+        settings = req.data
+        if not settings:
+             raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT, message="Settings data is required")
+
+        manager = SettingsManager()
+        result = manager.save_settings(settings)
+        return {"status": "success", "settings": result}
+    except Exception as e:
+        logger.error(f"Error saving settings: {e}", exc_info=True)
+        raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message=str(e))

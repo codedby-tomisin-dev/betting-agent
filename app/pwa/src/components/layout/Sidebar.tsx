@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { LayoutDashboard, History, Settings, Bot } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/utils";
 
 const navigation = [
     { name: "Dashboard", href: "/", icon: LayoutDashboard },
