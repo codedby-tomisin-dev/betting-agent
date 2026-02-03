@@ -2,7 +2,7 @@
 
 import { useBets } from "@/shared/hooks";
 import { useDashboardStats } from "../hooks/useDashboardStats";
-import { StatsCardsView } from "./StatsCardsView";
+import { BalanceOverview } from "./BalanceOverview";
 import { PerformanceChartView } from "./PerformanceChartView";
 import { BetApprovalContainer, ActiveBetsListView } from "@/features/betting";
 import { Toaster } from "@/components/ui/sonner";
@@ -23,14 +23,9 @@ export function DashboardContainer() {
         <div className="p-8 space-y-8 max-w-7xl mx-auto">
             <Toaster />
 
-            <div className="space-y-2">
-                <h1 className="text-3xl font-bold">Welcome back!</h1>
-                <p className="text-gray-500">Here&apos;s your betting performance at a glance.</p>
-            </div>
+            <BalanceOverview stats={stats} />
 
             <BetApprovalContainer bets={bets} />
-
-            <StatsCardsView stats={stats} />
 
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                 <div className="lg:col-span-3">

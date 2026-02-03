@@ -35,7 +35,7 @@ export function PerformanceChartView({ bets }: PerformanceChartViewProps) {
             <CardHeader>
                 <CardTitle>Performance Overview</CardTitle>
             </CardHeader>
-            <CardContent className="pl-2">
+            <CardContent className="pl-2 -ml-8">
                 <div className="h-[300px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={chartData}>
