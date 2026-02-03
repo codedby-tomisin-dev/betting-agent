@@ -287,11 +287,11 @@ class BetfairExchange(BaseBettingPlatform):
             filter_kwargs = {}
             
         if settled_date_range:
-             time_range = betfairlightweight.filters.time_range(
-                 from_=settled_date_range[0].strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-                 to_=settled_date_range[1].strftime("%Y-%m-%dT%H:%M:%S.000Z")
-             )
-             filter_kwargs["settled_date_range"] = time_range
+            time_range = betfairlightweight.filters.time_range(
+                from_=settled_date_range[0].strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+                to_=settled_date_range[1].strftime("%Y-%m-%dT%H:%M:%S.000Z")
+            )
+            filter_kwargs["settled_date_range"] = time_range
 
         # Only create market_filter if we are filtering by bet_ids? 
         # Actually list_cleared_orders takes specific args like bet_ids directly or in the body.
@@ -306,18 +306,13 @@ class BetfairExchange(BaseBettingPlatform):
         )
         
         results = []
-        if cleared_orders and cleared_orders.cleared_orders:
-            for order in cleared_orders.cleared_orders:
+        if cleared_orders and cleared_orders.orders:
+            for order in cleared_orders.orders:
                 results.append({
                     "bet_id": order.bet_id,
                     "market_id": order.market_id,
                     "selection_id": order.selection_id,
                     "status": "WON" if order.profit > 0 else "LOST", 
-                    # If profit is 0 it could be void or push, or lost stake if profit implies net. 
-                    # Betfair 'profit' is usually profit/loss excluding stake for some, or P/L including stake?
-                    # Usually 'profit' field is Realised Profit/Loss.
-                    # If lost, profit is -stake.
-                    
                     "profit": order.profit,
                     "settled_date": order.settled_date,
                     "side": order.side,

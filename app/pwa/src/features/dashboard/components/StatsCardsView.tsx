@@ -21,7 +21,7 @@ export function StatsCardsView({ stats }: StatsCardsViewProps) {
                     <CardContent>
                         <div className="text-4xl font-bold">{formatCurrency(stats.currentBalance)}</div>
                         <p className="text-xs text-muted-foreground">
-                            +{formatCurrency(stats.totalProfit)}
+                            {stats.totalProfit >= 0 ? "+" : ""}{formatCurrency(stats.totalProfit)}
                         </p>
                     </CardContent>
                 </Card>

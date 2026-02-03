@@ -15,6 +15,7 @@ import { AddMatchDialog } from "./AddMatchDialog";
 import { Plus } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { BetAIReasoning } from "./BetAIReasoning";
 
 interface PendingBetCardProps {
     bet: Bet;
@@ -84,16 +85,7 @@ export function PendingBetCard({
             </CardHeader>
 
             <CardContent className="space-y-4">
-                {bet.ai_reasoning && (
-                    <div className="p-4 bg-blue-50 rounded-sm border border-blue-100">
-                        <p className="text-sm font-semibold text-blue-900 mb-2">AI Analysis Summary</p>
-                        <div className="text-sm text-blue-800 prose prose-sm max-w-none">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                {bet.ai_reasoning}
-                            </ReactMarkdown>
-                        </div>
-                    </div>
-                )}
+                <BetAIReasoning reasoning={bet.ai_reasoning || ""} defaultOpen={true} />
 
                 {groupedSelections.map((group, groupIdx) => (
                     <BetSelectionGroup

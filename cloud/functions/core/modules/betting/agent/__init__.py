@@ -3,12 +3,9 @@ from pathlib import Path
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIModel
 
-from constants import OPEN_AI_API_KEY
 from .tools import web_search
 from ..models import BettingAgentResponse
 
-# Set OpenAI API key
-os.environ["OPENAI_API_KEY"] = OPEN_AI_API_KEY
 
 model = OpenAIModel(
     model_name="gpt-4o",

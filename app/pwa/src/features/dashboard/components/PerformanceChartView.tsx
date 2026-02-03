@@ -15,7 +15,7 @@ export function PerformanceChartView({ bets }: PerformanceChartViewProps) {
     const chartData = useMemo(() => {
         const data: ChartDataPoint[] = bets
             .filter(b => b.status === "finished" && b.balance?.ending !== undefined)
-            .sort((a, b) => new Date(a.created_at as Date).getTime() - new Date(b.created_at as Date).getTime())
+            .sort((a, b) => new Date(a.target_date).getTime() - new Date(b.target_date).getTime())
             .map(b => ({
                 date: format(new Date(b.target_date), "d MMM yyyy"),
                 balance: b.balance?.ending
