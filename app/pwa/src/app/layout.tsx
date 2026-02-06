@@ -1,19 +1,13 @@
-import type { Metadata } from "next";
 import { Exo_2 } from "next/font/google";
 import "./globals.css";
+import { BottomNav } from "@/components/layout/BottomNav";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 
 const exo2 = Exo_2({
-  variable: "--font-exo-2",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-exo-2",
 });
-
-export const metadata: Metadata = {
-  title: "AI Betting Agent",
-  description: "Automated betting with AI-powered analysis.",
-};
 
 export default function RootLayout({
   children,
@@ -27,13 +21,14 @@ export default function RootLayout({
         <meta name="theme-color" content="#000000" />
       </head>
       <body
-        className={`${exo2.variable} antialiased bg-gray-50`} style={{fontFamily: exo2.style.fontFamily}}
+        className={`${exo2.variable} antialiased bg-gray-100`} style={{ fontFamily: exo2.style.fontFamily }}
       >
         <Sidebar />
         <Header />
-        <main className="ml-64 mt-16 overflow-y-auto h-[calc(100vh-4rem)]">
+        <main className="ml-0 md:ml-64 mt-16 overflow-y-auto h-[calc(100vh-4rem)] mb-16 md:mb-0 p-4 md:p-6 transition-all duration-200">
           {children}
         </main>
+        <BottomNav />
       </body>
     </html>
   );

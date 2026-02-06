@@ -1,14 +1,13 @@
 import { formatCurrency } from "@/shared/utils";
 
+import { DashboardStats } from "../types";
+
 interface BalanceOverviewProps {
-    stats: {
-        currentBalance: number;
-        totalProfit: number;
-    }
+    stats: DashboardStats;
 }
 
 export function BalanceOverview({ stats }: BalanceOverviewProps) {
-    const isPositive = stats.totalProfit >= 0;
+    const isPositive = stats.recentProfit >= 0;
     const [major, minor] = formatCurrency(stats.currentBalance).split(".");
 
     return (
@@ -27,7 +26,7 @@ export function BalanceOverview({ stats }: BalanceOverviewProps) {
 
                 <div className="flex items-center gap-2 text-sm">
                     <span className={isPositive ? "text-green-600 font-[800]" : "text-red-600 font-medium"}>
-                        {isPositive ? "+" : ""}{formatCurrency(stats.totalProfit)}
+                        {isPositive ? "+" : ""}{formatCurrency(stats.recentProfit)}
                     </span>
                     <span className="text-muted-foreground">• {isPositive ? "Gained" : "Lost"}</span>
                 </div>

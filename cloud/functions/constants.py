@@ -25,6 +25,14 @@ RELIABLE_TEAMS = {
         "Aston Villa"
     ],
 
+    "English Football League Cup": [
+        "Man City",
+        "Arsenal",
+        "Liverpool",
+        "Chelsea",
+        "Man Utd"
+    ],
+
     "FA Cup": [
         "Man City",      # CL winners + dominant EPL over last cycles
         "Arsenal",              # Sustained top-tier performance

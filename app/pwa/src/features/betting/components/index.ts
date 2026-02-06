@@ -5,4 +5,4 @@ export { BetSelectionGroup } from './BetSelectionGroup';
 export { BetTotalsDisplay } from './BetTotalsDisplay';
 export { AddMarketDialog } from './AddMarketDialog';
 export { AddMatchDialog } from './AddMatchDialog';
-export { ActiveBetsListView } from './ActiveBetsListView';
+export { RecentBetsListView } from './RecentBetsListView';

@@ -26,7 +26,7 @@ export function RiskAppetiteSlider({
                 id="risk"
                 min={1}
                 max={5}
-                step={0.5}
+                step={0.1}
                 value={[value]}
                 onValueChange={(values) => onChange(values[0])}
                 className="w-full"

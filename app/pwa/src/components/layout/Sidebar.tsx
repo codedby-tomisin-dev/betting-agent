@@ -14,7 +14,7 @@ export function Sidebar() {
     // const pathname = usePathname(); 
 
     return (
-        <div className="flex h-screen w-64 flex-col bg-[#111827] text-white fixed left-0 top-0">
+        <div className="hidden md:flex h-screen w-64 flex-col bg-[#111827] text-white fixed left-0 top-0">
             <div className="flex h-16 items-center px-6">
                 <Bot className="h-8 w-8 text-green-500 mr-2" />
                 <div>

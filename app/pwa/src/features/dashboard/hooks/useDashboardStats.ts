@@ -30,12 +30,29 @@ export function useDashboardStats(bets: Bet[]): DashboardStats {
         const latestBet = bets[0];
         const currentBalance = latestBet?.balance?.ending ?? latestBet?.balance?.starting ?? 0;
 
+        // Calculate profit from the latest finished bet
+        const sortedFinishedBets = [...finishedBets].sort((a, b) => {
+            const dateA = new Date(a.placed_at as Date || 0).getTime();
+            const dateB = new Date(b.placed_at as Date || 0).getTime();
+            return dateB - dateA;
+        });
+
+        const latestFinishedBet = sortedFinishedBets[0];
+        let recentProfit = 0;
+
+        if (latestFinishedBet?.balance?.ending != null && latestFinishedBet?.balance?.starting != null) {
+            recentProfit = latestFinishedBet.balance.ending - latestFinishedBet.balance.starting;
+        } else if (latestFinishedBet) {
+            recentProfit = latestFinishedBet.realized_returns || 0;
+        }
+
         return {
             totalProfit,
             winRate,
             currentBalance,
             wins,
             finishedBetsCount: finishedBets.length,
+            recentProfit,
         };
     }, [bets]);
 }

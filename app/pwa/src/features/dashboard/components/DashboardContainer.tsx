@@ -4,7 +4,7 @@ import { useBets } from "@/shared/hooks";
 import { useDashboardStats } from "../hooks/useDashboardStats";
 import { BalanceOverview } from "./BalanceOverview";
 import { PerformanceChartView } from "./PerformanceChartView";
-import { BetApprovalContainer, ActiveBetsListView } from "@/features/betting";
+import { BetApprovalContainer, RecentBetsListView } from "@/features/betting";
 import { Toaster } from "@/components/ui/sonner";
 
 export function DashboardContainer() {
@@ -20,7 +20,7 @@ export function DashboardContainer() {
     }
 
     return (
-        <div className="p-8 space-y-8 max-w-7xl mx-auto">
+        <div className="space-y-8 max-w-7xl mx-auto">
             <Toaster />
 
             <BalanceOverview stats={stats} />
@@ -32,7 +32,7 @@ export function DashboardContainer() {
                     <PerformanceChartView bets={bets} />
                 </div>
                 <div className="lg:col-span-2">
-                    <ActiveBetsListView bets={bets} />
+                    <RecentBetsListView bets={bets} />
                 </div>
             </div>
         </div>

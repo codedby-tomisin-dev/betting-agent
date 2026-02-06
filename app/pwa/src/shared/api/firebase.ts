@@ -19,12 +19,12 @@ const functions = getFunctions(app, "europe-west2");
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-if (typeof window !== "undefined" && window.location.hostname === "localhost") {
-    console.log("Running in development mode - connecting to emulators");
-    connectFirestoreEmulator(db, 'localhost', 8080);
-    connectFunctionsEmulator(functions, 'localhost', 5001);
-    connectStorageEmulator(storage, 'localhost', 9199);
-}
+// if (typeof window !== "undefined" && window.location.hostname === "localhost") {
+//     console.log("Running in development mode - connecting to emulators");
+//     connectFirestoreEmulator(db, 'localhost', 8080);
+//     connectFunctionsEmulator(functions, 'localhost', 5001);
+//     connectStorageEmulator(storage, 'localhost', 9199);
+// }
 
 let analytics;
 if (typeof window !== "undefined") {

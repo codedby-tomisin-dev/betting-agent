@@ -1,6 +1,6 @@
 // Public API for betting feature
 export { BetApprovalContainer } from './components/BetApprovalContainer';
-export { ActiveBetsListView } from './components/ActiveBetsListView';
+export { RecentBetsListView } from './components/RecentBetsListView';
 
 // Re-export types that consumers might need
 export type { Bet, BetSelectionItem, BetStatus, SelectionEventGroup } from './types';

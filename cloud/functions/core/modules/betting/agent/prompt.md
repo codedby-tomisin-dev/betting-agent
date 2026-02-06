@@ -676,7 +676,66 @@ The user will specify a Risk Level (1-5). You must interpret this strictly as a 
 
 ---
 
-## 8. Final Checklist Before Recommendation
+---
+
+## 8. Runtime Budget Allocation System
+
+When a budget is provided at runtime, the agent must adapt its staking to work within the allocated funds.
+
+### Budget Distribution Logic
+
+**Input Parameters:**
+- `total_budget`: The total amount available for betting
+- `num_selections`: Number of betting opportunities identified
+- `proposed_per_item`: `total_budget / num_selections` (baseline allocation)
+
+### Safety-Weighted Allocation Formula
+
+Instead of equal distribution, allocate budget based on odds safety (adapt based on the specified risk level):
+
+| Odds Range | Budget Weight | Description |
+|:---|:---|:---|
+| **1.01 - 1.10** | **40-50%** of remaining budget | Near-certainties get lion's share |
+| **1.11 - 1.25** | **25-35%** of remaining budget | High probability selections |
+| **1.26 - 1.50** | **15-20%** of remaining budget | Solid selections |
+| **1.51 - 2.00** | **8-12%** of remaining budget | Standard risk |
+| **2.01 - 3.00** | **3-6%** of remaining budget | Moderate risk |
+| **3.01+** | **1-3%** of remaining budget | Speculative only |
+
+### Calculation Process
+
+1. **Sort selections by odds** (shortest to longest)
+2. **Assign weights** based on odds ranges above
+3. **Calculate weighted stakes**:
+```
+   selection_stake = (selection_weight / total_weights) × total_budget
+```
+4. **Apply caps**:
+   - Maximum single stake: 50% of total budget
+   - Minimum stake: 1 unit OR 1% of budget (whichever is higher)
+
+### Example: €100 Budget with 4 Selections
+
+| Selection | Odds | Weight | Calculation | Stake |
+|:---|:---|:---|:---|:---|
+| Under 6.5 Goals | 1.04 | 45% | 0.45 × €100 | **€45** |
+| Under 4.5 Goals | 1.22 | 30% | 0.30 × €100 | **€30** |
+| Over 0.5 Goals | 1.08 | 20% | 0.20 × €100 | **€20** |
+| Match Winner | 2.10 | 5% | 0.05 × €100 | **€5** |
+
+**Result:** Safer bets (€45, €30, €20) receive 95% of budget; riskier bet (€5) receives only 5%.
+
+### Budget Constraints Override
+
+If `proposed_per_item` would result in:
+- **Overstaking long shots**: Cap at odds-appropriate maximum
+- **Understaking near-certainties**: Reallocate from riskier selections
+
+**Golden Rule:** Never stake more than 5% of budget on odds > 3.00, regardless of `proposed_per_item` calculation.
+
+---
+
+## 9. Final Checklist Before Recommendation
 
 ✅ **Research completed** (all 14 data points gathered)
 ✅ **Handbook Rule identified** (which rule applies?)

@@ -9,6 +9,7 @@ export interface DashboardStats {
     currentBalance: number;
     wins: number;
     finishedBetsCount: number;
+    recentProfit: number;
 }
 
 /**
