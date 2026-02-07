@@ -3,9 +3,8 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Bell, Loader2, X } from "lucide-react";
-import { getUserNotifications } from "@/shared/api/notificationsApi";
-import { Notification } from "@/shared/api/notificationsApi";
+import { Bell, Loader2 } from "lucide-react";
+import { getUserNotifications, Notification } from "@/shared/api/notificationsApi";
 import { formatDistanceToNow } from "date-fns";
 
 interface NotificationModalProps {
@@ -48,7 +47,7 @@ export function NotificationModal({ isOpen, onOpenChange }: NotificationModalPro
                         <Bell className="h-5 w-5 text-gray-600" />
                         Notifications
                     </DialogTitle>
-                    {/* Close button is automatically added by DialogContent usually, but ensure spacing */}
+                    {/* Close button is automatically added by DialogContent */}
                 </DialogHeader>
 
                 <div className="flex flex-col h-[500px]">
@@ -68,10 +67,10 @@ export function NotificationModal({ isOpen, onOpenChange }: NotificationModalPro
                         <div className="flex-1 flex flex-col items-center justify-center text-gray-400 p-4 text-center">
                             <Bell className="h-12 w-12 mb-3 opacity-20" />
                             <p className="text-lg font-medium text-gray-900 mb-1">No notifications</p>
-                            <p className="text-sm">We'll notify you when there's an update on your bets.</p>
+                            <p className="text-sm">We&apos;ll notify you when there&apos;s an update on your bets.</p>
                         </div>
                     ) : (
-                        <ScrollArea className="flex-1">
+                        <div className="flex-1 overflow-y-auto">
                             <div className="flex flex-col divide-y divide-gray-100">
                                 {notifications.map((notification) => (
                                     <div
@@ -87,7 +86,7 @@ export function NotificationModal({ isOpen, onOpenChange }: NotificationModalPro
                                                     {(() => {
                                                         try {
                                                             return formatDistanceToNow(new Date(notification.timestamp), { addSuffix: true });
-                                                        } catch (e) {
+                                                        } catch {
                                                             return '';
                                                         }
                                                     })()}
@@ -98,7 +97,7 @@ export function NotificationModal({ isOpen, onOpenChange }: NotificationModalPro
                                     </div>
                                 ))}
                             </div>
-                        </ScrollArea>
+                        </div>
                     )}
                 </div>
             </DialogContent>
