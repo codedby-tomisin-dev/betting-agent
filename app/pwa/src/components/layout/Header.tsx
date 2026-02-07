@@ -1,45 +1,40 @@
 "use client";
-
-import { Bell, Moon, Sun } from "lucide-react";
+import { Bell, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { NotificationModal } from "@/features/notifications/components/NotificationModal";
 
 export function Header() {
-  const [isDark, setIsDark] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
   return (
-    <header className="fixed top-0 left-0 md:left-64 right-0 h-16 bg-white border-b border-gray-200 z-10 transition-all duration-200">
-      <div className="flex items-center justify-between h-full px-8">
-        {/* Left side - Page title */}
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-gray-100 rounded">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <rect width="20" height="20" rx="2" fill="#E5E7EB" />
-              <rect x="4" y="4" width="12" height="12" rx="1" fill="#9CA3AF" />
-            </svg>
+    <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-50 transition-all duration-200">
+      <div className="flex items-center justify-between h-full px-6">
+        {/* Left side - Brand and Page title */}
+        <div className="flex items-center gap-6">
+          <div className="flex items-center">
+            <Bot className="h-8 w-8 text-green-600 mr-2" />
+            <h1 className="text-lg font-bold leading-none text-gray-900">BetAgent</h1>
           </div>
-          <h1 className="text-xl font-semibold text-gray-900">Dashboard</h1>
         </div>
 
-        {/* Right side - Utility icons */}
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="h-5 w-5 text-gray-600" />
-            <span className="absolute top-1 right-1 h-2 w-2 bg-green-500 rounded-full"></span>
-          </Button>
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setIsDark(!isDark)}
+            className="relative"
+            onClick={() => setIsNotificationsOpen(true)}
           >
-            {isDark ? (
-              <Sun className="h-5 w-5 text-gray-600" />
-            ) : (
-              <Moon className="h-5 w-5 text-gray-600" />
-            )}
+            <Bell className="h-5 w-5 text-gray-600" />
           </Button>
+
+          <NotificationModal
+            isOpen={isNotificationsOpen}
+            onOpenChange={setIsNotificationsOpen}
+          />
         </div>
       </div>
     </header>
   );
 }
+

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -69,8 +70,10 @@ export function RecentBetsListView({ bets }: RecentBetsListViewProps) {
             <Card className="h-full">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
                     <CardTitle>Recent Activity</CardTitle>
-                    <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-50 font-medium">
-                        View More <ArrowRight className="ml-2 h-4 w-4" />
+                    <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-700 font-medium" asChild>
+                        <Link href="/history">
+                            View More <ArrowRight className="ml-2 h-4 w-4" />
+                        </Link>
                     </Button>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -87,7 +90,6 @@ export function RecentBetsListView({ bets }: RecentBetsListViewProps) {
                     )}
                 </CardContent>
                 <CardFooter className="flex items-center justify-between border-t pt-6">
-                    <p className="text-sm text-muted-foreground">Last 7 days</p>
                     <div className="flex items-center gap-4 text-sm font-medium">
                         <span className="flex items-center gap-2">
                             <span className="h-2 w-2 rounded-full bg-green-500" />

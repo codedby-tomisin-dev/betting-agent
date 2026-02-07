@@ -570,3 +570,8 @@ class BettingManager:
             "active_bets_checked": len(placed_bets),
             "bets_updated": updated_count
         }
+    def get_bet_history(self, limit: int = 20, start_after_id: Optional[str] = None, status: Optional[str] = None, date_range: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+        """
+        Get paginated bet history.
+        """
+        return self.repo.get_bet_history(limit, start_after_id, status, date_range)

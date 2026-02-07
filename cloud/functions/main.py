@@ -16,6 +16,7 @@ from core.modules.betting.repository import BetRepository
 from core.modules.settings.manager import SettingsManager
 from utils.responses import make_error_response, make_success_response
 from constants import AUTOMATED_BETTING_OPTIONS, RELIABLE_TEAMS
+from core.modules.notifications import NotificationManager
 
 
 # For cost control, you can set the maximum number of containers that can be
@@ -463,3 +464,34 @@ def save_settings(req: https_fn.CallableRequest) -> Any:
     except Exception as e:
         logger.error(f"Error saving settings: {e}", exc_info=True)
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message=str(e))
+
+
+@https_fn.on_call(cors=cors_options)
+def user_notifications(req: https_fn.CallableRequest) -> Any:
+    """
+    Get user notifications.
+    """
+    try:
+        manager = NotificationManager()
+        return manager.get_user_notifications()
+    except Exception as e:
+        logger.error(f"Error fetching notifications: {e}", exc_info=True)
+        raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message=str(e))
+@https_fn.on_call(cors=cors_options)
+def get_bet_history(req: https_fn.CallableRequest) -> Any:
+    """
+    Get paginated bet history.
+    """
+    try:
+        data = req.data
+        limit = data.get("limit", 20)
+        start_after_id = data.get("start_after_id")
+        status = data.get("status")
+        date_range = data.get("date_range")
+        
+        manager = BettingManager()
+        return manager.get_bet_history(limit, start_after_id, status, date_range)
+    except Exception as e:
+        logger.error(f"Error fetching bet history: {e}", exc_info=True)
+        raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message=str(e))
+

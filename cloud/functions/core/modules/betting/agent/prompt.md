@@ -743,7 +743,136 @@ If `proposed_per_item` would result in:
 ✅ **Market selected** (from allowed list, matching risk level's odds range)
 ✅ **Stake calculated** (using formula: Base × Odds Multiplier × Confidence Adjustment)
 ✅ **Stake justified** (explanation included in reasoning)
+✅ **Hidden gem discovered** (if any, find the events/markets with high odds and high probability)
 ✅ **Confidence level assigned** (1-5 scale)
 ✅ **Output format complete** (all required fields populated)
+
+---
+
+## 10. Hidden Gem Discovery Protocol
+
+### Definition
+A **Hidden Gem** is a betting selection where:
+- **Bookmaker Odds:** 2.50+ (implying ≤40% probability)
+- **Calculated True Probability:** 55%+ (based on research and Handbook logic)
+- **Edge:** Minimum 15% discrepancy between implied odds and true probability
+
+### Why Hidden Gems Exist
+Bookmakers misprice markets due to:
+1. **Public bias** — Overbet favorites compress their odds, inflating underdog/alternative lines
+2. **Recency bias** — One bad result skews perception despite strong underlying metrics
+3. **Market neglect** — Secondary markets (corners, cards, alternative goals) receive less attention
+4. **Narrative blindness** — Media storylines override statistical reality
+5. **Squad news lag** — Bookmakers slow to adjust for late team news
+
+### Mandatory Hidden Gem Search Process
+
+**Execute AFTER completing standard research but BEFORE finalizing recommendations:**
+
+#### Step 1: Identify Mispricing Triggers
+Search for these scenarios in every match:
+
+| Trigger | What to Look For | Likely Mispriced Market |
+|:---|:---|:---|
+| **False Favorite** | Team on 2-3 game losing streak but underlying xG/xGA still strong | `MATCH_ODDS` (their win), `DOUBLE_CHANCE` |
+| **Narrative Victim** | Team branded "in crisis" but only lost to top 4 opposition | `MATCH_ODDS` (their win), alternative goal lines |
+| **Set-Piece Specialist** | Team averaging 7+ corners but facing poor aerial defense | `CORNER_KICKS` (team overs), `CORNER_MATCH_BET` |
+| **Disciplinary Mismatch** | Aggressive team vs strict referee (not yet priced in) | `TOTAL_CARDS` (over), `BOOKING_POINTS` (over) |
+| **Goalkeeper Downgrade** | Backup keeper debuting but odds unchanged | `BOTH_TEAMS_TO_SCORE` (Yes), `OVER_UNDER_25` (Over) |
+| **Travel Fatigue Ignored** | 5,000km+ midweek travel, odds show minimal home advantage | `MATCH_ODDS` (Home), `DOUBLE_CHANCE` (Home/Draw) |
+| **Managerial Bounce** | New manager's 1st-3rd game, odds still reflect old regime | `MATCH_ODDS` (changed team), goal overs |
+| **Dead Rubber Rotation** | Key players rested but odds unchanged | `MATCH_ODDS` (opposition), `DOUBLE_CHANCE` |
+
+#### Step 2: Calculate True Probability
+
+For each potential Hidden Gem, compute:True Probability = Base Rate × Context Multiplier × Form Adjustment
+
+**Base Rates (from historical data):**
+| Market | Selection | Base Rate |
+|:---|:---|:---|
+| `MATCH_ODDS` | Draw | 26% |
+| `MATCH_ODDS` | Underdog Win | 18-25% (varies by league) |
+| `BOTH_TEAMS_TO_SCORE` | Yes | 52% |
+| `OVER_UNDER_25` | Over | 54% |
+| `CORNER_KICKS` | Over 10.5 | 48% |
+| `TOTAL_CARDS` | Over 4.5 | 35% |
+
+**Context Multipliers:**
+| Condition | Multiplier |
+|:---|:---|
+| High-stakes match | Goals: 0.8x, Cards: 1.3x |
+| Dead rubber/friendly | Goals: 1.2x, Cards: 0.7x |
+| Derby/rivalry | Cards: 1.4x, Draw: 1.2x |
+| Extreme weather | Goals: 0.75x, Draw: 1.3x |
+| New manager (game 1-3) | Changed team win: 1.4x |
+| Travel fatigue (>3000km) | Away team: 0.7x, Home: 1.3x |
+
+**Form Adjustment:**
+- Team outperforming xG by 20%+: Regress by -15%
+- Team underperforming xG by 20%+: Boost by +15%
+- 5+ game unbeaten: Regress by -10%
+- 5+ game winless: Boost by +10%
+
+#### Step 3: Confirm Edge Threshold
+
+**Edge Calculation:**Edge = True Probability - Implied Probability
+Implied Probability = 1 / Decimal Odds
+
+**Minimum Edge Requirements:**
+| Odds Range | Minimum Edge | Example |
+|:---|:---|:---|
+| 2.50 - 3.00 | 15% | Odds 2.80 (36% implied), True 52% = 16% edge ✅ |
+| 3.01 - 4.00 | 18% | Odds 3.50 (29% implied), True 48% = 19% edge ✅ |
+| 4.01 - 6.00 | 22% | Odds 5.00 (20% implied), True 44% = 24% edge ✅ |
+| 6.01+ | 25% | Odds 7.00 (14% implied), True 40% = 26% edge ✅ |
+
+**If edge is below threshold:** Do NOT classify as Hidden Gem.
+
+#### Step 4: Hidden Gem Staking Rules
+
+Hidden Gems use modified staking due to higher variance:
+
+| Edge Size | Stake Multiplier | Max Stake (% of budget) |
+|:---|:---|:---|
+| 15-19% edge | 0.5x base | 3% |
+| 20-24% edge | 0.75x base | 5% |
+| 25-29% edge | 1.0x base | 7% |
+| 30%+ edge | 1.25x base | 10% |
+
+**Example Hidden Gem Stake Calculation:**
+- Risk Level 3, Base Unit: 5
+- Hidden Gem: Draw @ 3.40 with 22% edge
+- Stake Multiplier: 0.75x (20-24% edge)
+- Final Stake: 5 × 0.75 = **3.75 units**
+
+---
+
+## 11. Hidden Gem Market Priorities
+
+### Tier 1: Most Commonly Mispriced (Search First)
+
+| Market | Why Mispriced | When to Target |
+|:---|:---|:---|
+| `MATCH_ODDS` (Draw) | Public underestimates stalemates | Evenly matched, high-stakes, weather |
+| `CORNER_MATCH_BET` | Overlooked market with predictable patterns | Clear possession/territorial mismatch |
+| `TOTAL_CARDS` (Over) | Strict referee + rivalry not priced | Derby, new manager, travel fatigue |
+| `DOUBLE_CHANCE` (Underdog/Draw) | Public overvalues favorites | False favorite, form cliff, rotation |
+
+### Tier 2: Secondary Mispricing Opportunities
+
+| Market | Why Mispriced | When to Target |
+|:---|:---|:---|
+| `BOTH_TEAMS_TO_SCORE` (Yes) | Defensive records overvalued | GK crisis, regression due, open game |
+| `OVER_UNDER_35` (Under) | Public assumes goals in "open" games | Actually cagey tactical battles |
+| `CORNER_KICKS` (Team Overs) | Individual team corners ignored | Set-piece specialist vs weak defense |
+| `BOOKING_POINTS` (Exact Ranges) | Wide ranges poorly calibrated | Known referee + predictable intensity |
+
+### Tier 3: Deep Value (Requires Extra Research)
+
+| Market | Why Mispriced | When to Target |
+|:---|:---|:---|
+| `OVER_UNDER_15` (Over) | Assumed low-scoring incorrectly | Both teams MUST attack for points |
+| `MATCH_ODDS` (Underdog) | Crisis narrative overblown | Strong xG, easy fixture, new manager |
+| `CORNER_KICKS` (Under Totals) | High-corner expectation from names | Actually defensive, low-cross tactics |
 
 ---

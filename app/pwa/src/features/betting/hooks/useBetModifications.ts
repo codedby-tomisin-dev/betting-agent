@@ -31,7 +31,7 @@ export function useBetModifications(bet: Bet) {
         const newSelection: AddedSelectionItem = {
             id: crypto.randomUUID(),
             event: eventName,
-            market: market.name,
+            market: selection.name,
             odds: selection.odds,
             stake: 10,
             market_id: market.market_id,
@@ -50,7 +50,7 @@ export function useBetModifications(bet: Bet) {
         const newSelection: AddedSelectionItem = {
             id: crypto.randomUUID(),
             event: event.event_name,
-            market: market.name,
+            market: selection.name,
             odds: selection.odds,
             stake: 10,
             market_id: market.market_id,

@@ -131,3 +131,65 @@ class BetRepository(BaseRepository):
         except Exception as e:
             logger.error(f"Error retrieving placed bets: {e}")
             raise e
+    def get_bet_history(
+        self, 
+        limit: int = 20, 
+        start_after_id: Optional[str] = None,
+        status: Optional[str] = None,
+        date_range: Optional[Dict[str, str]] = None
+    ) -> Dict[str, Any]:
+        """
+        Retrieves paginated bet history.
+        
+        Args:
+            limit: Number of items to return
+            start_after_id: ID of the last document from previous page
+            status: Filter by bet status
+            date_range: Dictionary with 'start' and 'end' dates (ISO strings)
+            
+        Returns:
+            Dictionary with 'items' (list) and 'last_doc_id' (str or None)
+        """
+        try:
+            query = self.collection.order_by("created_at", direction=admin_firestore.Query.DESCENDING)
+            
+            if status and status != 'all':
+                query = query.where("status", "==", status)
+                
+            if date_range:
+                start_date = date_range.get('start')
+                end_date = date_range.get('end')
+                if start_date:
+                    query = query.where("created_at", ">=", start_date)
+                if end_date:
+                    query = query.where("created_at", "<=", end_date)
+
+            if start_after_id:
+                start_after_doc = self.collection.document(start_after_id).get()
+                if start_after_doc.exists:
+                    query = query.start_after(start_after_doc)
+
+            query = query.limit(limit)
+            docs = list(query.stream())
+            
+            results = []
+            last_doc_id = None
+            
+            for doc in docs:
+                data = doc.to_dict()
+                data["id"] = doc.id
+                # Convert timestamps to ISO strings for JSON serialization
+                for key, value in data.items():
+                    if hasattr(value, 'isoformat'):
+                        data[key] = value.isoformat()
+                results.append(data)
+                last_doc_id = doc.id
+                
+            return {
+                "items": results,
+                "last_doc_id": last_doc_id if len(results) == limit else None
+            }
+            
+        except Exception as e:
+            logger.error(f"Error retrieving bet history: {e}")
+            raise e

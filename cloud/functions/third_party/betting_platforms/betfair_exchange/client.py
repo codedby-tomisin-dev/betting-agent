@@ -65,10 +65,10 @@ class BetfairExchange(BaseBettingPlatform):
         if market_type_codes is None:
             market_type_codes = [
                 'MATCH_ODDS', 'DOUBLE_CHANCE', 'OVER_UNDER', 'OVER_UNDER_05', 'OVER_UNDER_15',
-                'OVER_UNDER_25', 'OVER_UNDER_35', 'OVER_UNDER_45', 'OVER_UNDER_55', 'OVER_UNDER_65', 'TOTAL_POINTS', 'MONEY_LINE',
-                'TOTAL_CARDS', 'BOOKING_POINTS', 'OVER_UNDER_05_CARDS', 'OVER_UNDER_15_CARDS',
+                'OVER_UNDER_25', 'OVER_UNDER_35', 'OVER_UNDER_45', 'OVER_UNDER_55', 'OVER_UNDER_65',
+                'TOTAL_CARDS', 'OVER_UNDER_05_CARDS', 'OVER_UNDER_15_CARDS',
                 'OVER_UNDER_25_CARDS', 'OVER_UNDER_35_CARDS', 'OVER_UNDER_45_CARDS',
-                'CORNER_KICKS', 'CORNER_MATCH_BET', 'BOTH_TEAMS_TO_SCORE'
+                'BOTH_TEAMS_TO_SCORE'
             ]
 
         event_types = self.client.betting.list_event_types(
@@ -118,7 +118,7 @@ class BetfairExchange(BaseBettingPlatform):
                 competition_ids=competition_ids if competition_ids else None,
                 market_type_codes=market_type_codes,
             ),
-            max_results=35,
+            max_results=40,
             market_projection=['EVENT', 'RUNNER_METADATA', 'MARKET_START_TIME', 'MARKET_DESCRIPTION', 'COMPETITION']
         )
 
