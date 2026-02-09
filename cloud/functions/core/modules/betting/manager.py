@@ -9,10 +9,10 @@ from core.firestore import admin_firestore
 from core.modules.betting.agent import betting_agent
 from core.modules.betting.models import AnalyzeBetsRequest, BettingAgentResponse, GetOddsRequest, PlaceBetRequest
 from core.modules.betting.repository import BetRepository
-from constants import AUTOMATED_BETTING_OPTIONS
+from constants import AUTOMATED_BETTING_OPTIONS, RELIABLE_TEAMS
 from third_party.betting_platforms.models import Event
 from third_party.betting_platforms.betfair_exchange import BetfairExchange
-
+from core.modules.settings.manager import SettingsManager
 
 class BettingManager:
     """Manager for betting analysis and recommendations"""
@@ -21,6 +21,40 @@ class BettingManager:
         self.betfair = BetfairExchange()
         self.betfair.login()
         self.repo = BetRepository()
+        self.settings_manager = SettingsManager()
+
+    def get_all_upcoming_games(self, sport: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Get all upcoming games from Betfair based on user settings.
+        
+        Args:
+            date: Optional date string in YYYY-MM-DD format to filter games.
+
+        Returns:
+            List of formatted game objects for the frontend.
+        """
+        # Use competitions from RELIABLE_TEAMS constants to ensure we show relevant leagues
+        # This matches the user request to "show other options that are not AI recommended"
+        # but are still in the trusted leagues.
+        competitions = list(RELIABLE_TEAMS.keys())
+        
+        logger.info(f"Fetching upcoming games for competitions: {competitions}")
+        
+        try:
+            games = self.betfair.search_market(sport=sport, competitions=competitions)
+            
+            formatted_games = []
+
+            for game in games:
+                formatted_games.append(game)
+            
+            formatted_games.sort(key=lambda x: x["time"])
+            
+            return formatted_games
+            
+        except Exception as e:
+            logger.error(f"Error fetching upcoming games: {e}", exc_info=True)
+            return []
     
     def analyze_betting_opportunities(self, request: AnalyzeBetsRequest) -> Dict[str, Any]:
         """
@@ -128,8 +162,19 @@ class BettingManager:
         selections_items = []
         
         for rec in all_recommendations:
+            # Find the original event object that matches this recommendation
+            original_event = next((e for e in events if e.event_name == rec.pick.event_name), None)
+            
+            event_data = {
+                "name": rec.pick.event_name,
+                "time": original_event.event_time if original_event else None,
+                "competition": {
+                    "name": original_event.competition_name if original_event else "Unknown"
+                }
+            }
+
             selections_items.append({
-                "event": rec.pick.event_name,
+                "event": event_data,
                 "market": rec.pick.option_name,
                 "odds": rec.odds,
                 "stake": rec.stake,
@@ -570,6 +615,7 @@ class BettingManager:
             "active_bets_checked": len(placed_bets),
             "bets_updated": updated_count
         }
+    
     def get_bet_history(self, limit: int = 20, start_after_id: Optional[str] = None, status: Optional[str] = None, date_range: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """
         Get paginated bet history.

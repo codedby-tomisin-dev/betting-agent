@@ -390,9 +390,16 @@ def analyze_bets(req: https_fn.Request) -> https_fn.Response:
     """
     
     data = req.get_json()
+
+    settings_manager = SettingsManager()
+
+    data.setdefault('risk_appetite', settings_manager.get_setting('RISK_APPETITE', 3))
+    data.setdefault('budget', settings_manager.get_setting('BUDGET', settings_manager.get_setting('DEFAULT_BUDGET', 100)))
+
+    analysis_request = AnalyzeBetsRequest(**data)
     
     try:
-        result = BettingManager().analyze_betting_opportunities(data)
+        result = BettingManager().analyze_betting_opportunities(analysis_request)
         return make_success_response(result)
     except Exception as e:
         logger.error(f"Betting agent error: {e}")
@@ -466,6 +473,22 @@ def save_settings(req: https_fn.CallableRequest) -> Any:
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message=str(e))
 
 
+@https_fn.on_request(cors=cors_options)
+def get_upcoming_games(req: https_fn.Request) -> https_fn.Response:
+    """
+    Get all upcoming games based on user settings.
+    """
+    manager = BettingManager()
+    result = []
+    
+    try:
+        result = manager.get_all_upcoming_games(sport="Soccer")
+    except Exception as e:
+        logger.error(f"Error fetching upcoming games: {e}", exc_info=True)
+        return make_error_response(str(e))
+
+    return make_success_response(result)
+
 @https_fn.on_call(cors=cors_options)
 def user_notifications(req: https_fn.CallableRequest) -> Any:
     """
@@ -477,6 +500,7 @@ def user_notifications(req: https_fn.CallableRequest) -> Any:
     except Exception as e:
         logger.error(f"Error fetching notifications: {e}", exc_info=True)
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message=str(e))
+
 @https_fn.on_call(cors=cors_options)
 def get_bet_history(req: https_fn.CallableRequest) -> Any:
     """

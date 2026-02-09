@@ -28,9 +28,18 @@ export function useBetModifications(bet: Bet) {
         market: MarketOption,
         selection: SelectionOption
     ) => {
+        // Find full event details from the bet object
+        const fullEvent = bet.events?.find(e => e.name === eventName);
+
         const newSelection: AddedSelectionItem = {
             id: crypto.randomUUID(),
-            event: eventName,
+            event: {
+                name: eventName,
+                time: fullEvent?.time || new Date().toISOString(),
+                competition: {
+                    name: fullEvent?.competition.name || "Unknown"
+                }
+            },
             market: selection.name,
             odds: selection.odds,
             stake: 10,
@@ -40,7 +49,7 @@ export function useBetModifications(bet: Bet) {
 
         setAddedSelections(prev => [...prev, newSelection]);
         toast.success(`Added ${selection.name} to ${eventName}`);
-    }, []);
+    }, [bet.events]);
 
     const addNewMatchToBet = useCallback((
         event: BetEvent,
@@ -49,7 +58,7 @@ export function useBetModifications(bet: Bet) {
     ) => {
         const newSelection: AddedSelectionItem = {
             id: crypto.randomUUID(),
-            event: event.event_name,
+            event: event,
             market: selection.name,
             odds: selection.odds,
             stake: 10,
@@ -58,7 +67,7 @@ export function useBetModifications(bet: Bet) {
         };
 
         setAddedSelections(prev => [...prev, newSelection]);
-        toast.success(`Added ${event.event_name} - ${selection.name}`);
+        toast.success(`Added ${event.name} - ${selection.name}`);
     }, []);
 
     const removeSelectionFromBet = useCallback((
@@ -109,7 +118,7 @@ export function useBetModifications(bet: Bet) {
             const stableId = `added_${item.id}`;
             const editedStake = editedStakes[stableId];
             const baseItem: BetSelectionItem = {
-                event: item.event,
+                event: item.event, // Already structured in addMarketSelectionToBet/addNewMatchToBet
                 market: item.market,
                 odds: item.odds,
                 stake: item.stake,

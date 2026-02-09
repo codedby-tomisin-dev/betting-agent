@@ -15,7 +15,7 @@ class BettingAgentResponse(BaseModel):
         stake: float
         odds: float
         side: Optional[str] = Field(default="BACK", description="BACK or LAY")
-        reasoning: str
+        reasoning: str = Field(..., max_length=240, description="Brief analysis of the selection (max 240 chars)")
 
     recommendations: List[BetRecommendation]
     overall_reasoning: str

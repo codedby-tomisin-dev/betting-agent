@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # React Coding Standards & Golden Rules
 
 These rules are designed to turn an AI-generated React codebase into a maintainable, scalable, and battle-tested project.

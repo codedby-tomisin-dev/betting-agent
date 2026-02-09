@@ -1,8 +1,8 @@
 import { Bet } from "@/shared/types";
-import { formatBetTitle } from "../utils";
+import { BetSelectionModel, parseEventInfo } from "./BetSelectionModel";
 
 export class BetModel {
-    private bet: Bet;
+    private readonly bet: Bet;
 
     constructor(bet: Bet) {
         this.bet = bet;
@@ -13,7 +13,19 @@ export class BetModel {
     }
 
     get title(): string {
-        return formatBetTitle(this.bet.selections?.items);
+        const items = this.bet.selections?.items;
+        if (!items || items.length === 0) {
+            return "No selections";
+        }
+
+        const firstEvent = parseEventInfo(items[0].event);
+        const otherCount = items.length - 1;
+
+        if (otherCount > 0) {
+            return `${firstEvent.name} + ${otherCount} other${otherCount === 1 ? '' : 's'}`;
+        }
+
+        return firstEvent.name;
     }
 
     get targetDate(): Date | null {
@@ -55,7 +67,6 @@ export class BetModel {
             return this.endingBalance - this.startingBalance;
         }
 
-        // Fallback if balance snapshots aren't available
         return this.realizedReturns - this.stake;
     }
 
@@ -68,5 +79,32 @@ export class BetModel {
             return this.bet.balance?.ending != null ? this.endingBalance : this.realizedReturns;
         }
         return this.potentialReturns;
+    }
+
+    get selections(): BetSelectionModel[] {
+        return (this.bet.selections?.items || []).map(BetSelectionModel.from);
+    }
+
+    get selectionCount(): number {
+        return this.bet.selections?.items?.length || 0;
+    }
+
+    get eventNames(): string[] {
+        const items = this.bet.selections?.items || [];
+        // Deduplicate event names
+        const names = new Set<string>();
+        items.forEach(item => {
+            const eventInfo = parseEventInfo(item.event);
+            names.add(eventInfo.name);
+        });
+        return Array.from(names);
+    }
+
+    get rawData(): Bet {
+        return this.bet;
+    }
+
+    static from(bet: Bet): BetModel {
+        return new BetModel(bet);
     }
 }

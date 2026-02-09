@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Bet, BetEvent, MarketOption, SelectionOption } from "@/shared/types";
+import { getEventId } from "../models/BetSelectionModel";
 import { useBetModifications } from "../hooks/useBetModifications";
 import { groupSelectionsByEvent } from "../utils/groupSelectionsByEvent";
 import { calculateBetTotals } from "../utils/calculateBetTotals";
@@ -13,9 +13,6 @@ import { BetTotalsDisplay } from "./BetTotalsDisplay";
 import { AddMarketDialog } from "./AddMarketDialog";
 import { AddMatchDialog } from "./AddMatchDialog";
 import { Plus } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { BetAIReasoning } from "./BetAIReasoning";
 
 interface PendingBetCardProps {
     bet: Bet;
@@ -68,25 +65,12 @@ export function PendingBetCard({
         addNewMatchToBet(event, market, selection);
     };
 
-    const selectedEvent = bet.events?.find(e => e.event_name === selectedEventName);
-    const existingEventNames = groupedSelections.map(g => g.event);
+    const selectedEvent = bet.events?.find(e => e.name === selectedEventName);
+    const existingEventNames = groupedSelections.map(g => getEventId(g.event));
 
     return (
-        <Card className="border border-gray-200 shadow-xs">
-            <CardHeader className="pb-3">
-                <div className="flex justify-between items-start">
-                    <CardTitle className="text-base font-semibold">
-                        Proposed Bet Strategy
-                    </CardTitle>
-                    <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">
-                        Review Needed
-                    </Badge>
-                </div>
-            </CardHeader>
-
-            <CardContent className="space-y-4">
-                <BetAIReasoning reasoning={bet.ai_reasoning || ""} defaultOpen={true} />
-
+        <>
+            <CardContent className="space-y-4 -px-2 mt-2">
                 {groupedSelections.map((group, groupIdx) => (
                     <BetSelectionGroup
                         key={groupIdx}
@@ -95,7 +79,7 @@ export function PendingBetCard({
                         getEffectiveStake={getEffectiveStake}
                         onStakeChange={handleStakeChange}
                         onRemoveMarket={removeSelectionFromBet}
-                        onAddMarket={() => handleAddMarket(group.event)}
+                        onAddMarket={() => handleAddMarket(group.event.name)}
                         originalItemsLength={originalItems.length}
                     />
                 ))}
@@ -134,6 +118,6 @@ export function PendingBetCard({
                 existingEventNames={existingEventNames}
                 onSelectMatch={handleSelectMatch}
             />
-        </Card>
+        </>
     );
 }

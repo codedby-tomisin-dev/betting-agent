@@ -1,13 +1,15 @@
-import { BetSelectionItem, SelectionEventGroup } from '@/shared/types';
+import { BetSelectionItem, SelectionEventGroup, EventInfo } from '@/shared/types';
 import { AddedSelectionItem } from '../types';
+import { getEventId, parseEventInfo } from '../models/BetSelectionModel';
 
 interface ItemWithMetadata {
-    event: string;
+    event: EventInfo;
     market: string;
     odds: number;
     stake: number;
     market_id?: string;
     selection_id?: string | number;
+    reasoning?: string;
     stableId: string;
     isOriginal: boolean;
     originalIndex?: number;
@@ -15,7 +17,7 @@ interface ItemWithMetadata {
 }
 
 /**
- * Group selections by event name for display
+ * Group selections by event for display
  */
 export function groupSelectionsByEvent(
     originalItems: BetSelectionItem[],
@@ -23,18 +25,19 @@ export function groupSelectionsByEvent(
     removedIndices: Set<number>
 ): SelectionEventGroup[] {
     const originalWithMetadata: ItemWithMetadata[] = originalItems
+        .filter((_, idx) => !removedIndices.has(idx))
         .map((item, idx) => ({
-            event: item.event,
+            event: parseEventInfo(item.event as any),
             market: item.market,
             odds: item.odds,
             stake: item.stake,
             market_id: item.market_id,
             selection_id: item.selection_id,
+            reasoning: item.reasoning,
             originalIndex: idx,
-            isOriginal: true as const,
+            isOriginal: true,
             stableId: `original_${idx}`
-        }))
-        .filter((_, idx) => !removedIndices.has(idx));
+        }));
 
     const addedWithMetadata: ItemWithMetadata[] = addedItems.map((item, idx) => ({
         event: item.event,
@@ -43,30 +46,34 @@ export function groupSelectionsByEvent(
         stake: item.stake,
         market_id: item.market_id,
         selection_id: item.selection_id,
+        reasoning: item.reasoning,
         addedIndex: idx,
-        isOriginal: false as const,
+        isOriginal: false,
         stableId: `added_${item.id}`
     }));
 
-    const itemsWithIndices: ItemWithMetadata[] = [...originalWithMetadata, ...addedWithMetadata];
+    const itemsWithIndices = [...originalWithMetadata, ...addedWithMetadata];
 
     const groups: Record<string, SelectionEventGroup> = {};
 
     itemsWithIndices.forEach((item) => {
-        const eventName = item.event || "Unknown Event";
-        if (!groups[eventName]) {
-            groups[eventName] = {
-                event: eventName,
+        const eventKey = getEventId(item.event);
+
+        if (!groups[eventKey]) {
+            groups[eventKey] = {
+                event: item.event,
                 markets: []
             };
         }
-        groups[eventName].markets.push({
+
+        groups[eventKey].markets.push({
             market: item.market,
             odds: item.odds,
             stake: item.stake,
             potential_returns: item.stake * item.odds,
             market_id: item.market_id,
             selection_id: item.selection_id,
+            reasoning: item.reasoning,
             stableId: item.stableId,
             isOriginal: item.isOriginal,
             originalIndex: item.originalIndex,

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Bet } from "@/shared/types";
 import { ActiveBetDetailsDialog } from "./ActiveBetDetailsDialog";
 import { BetModel } from "../models/BetModel";
-import { RecentBetCard } from "./RecentBetCard";
+import { RecentActivityRow } from "./RecentActivityRow";
 
 interface RecentBetsListViewProps {
     bets: Bet[];
@@ -67,36 +67,37 @@ export function RecentBetsListView({ bets }: RecentBetsListViewProps) {
 
     return (
         <>
-            <Card className="h-full">
+            <Card className="h-full border-none shadow-none">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
-                    <CardTitle>Recent Activity</CardTitle>
+                    <CardTitle className="text-xl">Recent Activity</CardTitle>
                     <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-700 font-medium" asChild>
                         <Link href="/history">
                             View More <ArrowRight className="ml-2 h-4 w-4" />
                         </Link>
                     </Button>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent>
                     {recentBets.length === 0 ? (
                         <p className="text-sm text-muted-foreground text-center py-8">No recent betting activity.</p>
                     ) : (
-                        recentBets.map((bet) => (
-                            <RecentBetCard
+                        recentBets.map((bet, index) => (
+                            <RecentActivityRow
                                 key={bet.id}
                                 betModel={new BetModel(bet)}
                                 onClick={() => handleBetClick(bet)}
+                                isLast={index === recentBets.length - 1}
                             />
                         ))
                     )}
                 </CardContent>
-                <CardFooter className="flex items-center justify-between border-t pt-6">
-                    <div className="flex items-center gap-4 text-sm font-medium">
+                <CardFooter className="flex items-center justify-center border-t pt-6 mt-2">
+                    <div className="flex items-center gap-6 text-sm font-medium text-gray-600">
                         <span className="flex items-center gap-2">
-                            <span className="h-2 w-2 rounded-full bg-green-500" />
+                            <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
                             {wins} Won
                         </span>
                         <span className="flex items-center gap-2">
-                            <span className="h-2 w-2 rounded-full bg-red-500" />
+                            <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
                             {losses} Lost
                         </span>
                     </div>

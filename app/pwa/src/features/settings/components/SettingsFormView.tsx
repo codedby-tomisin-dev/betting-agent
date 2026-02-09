@@ -45,6 +45,13 @@ export function SettingsFormView({
                         </>
                     )}
                 </Button>
+                <Button variant="outline" onClick={onTriggerAnalysis} disabled={isAnalysisRunning}>
+                    {isAnalysisRunning ? "Running..." : (
+                        <>
+                            <Play className="mr-2 h-4 w-4" /> Run Analysis
+                        </>
+                    )}
+                </Button>
             </PageHeader>
 
             <div className="grid gap-6 md:grid-cols-2">

@@ -2,11 +2,6 @@
 trigger: always_on
 ---
 
-Perfect. Here are 10 golden rules to turn an AI-generated Python project into something you can confidently run, extend, and hand to another engineer without fear.
-
-These are written for real-world Python (services, scripts, data, APIs), not toy repos.
-
-⸻
 
 1. Make the Entry Point Obvious
 

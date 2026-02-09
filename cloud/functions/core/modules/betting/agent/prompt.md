@@ -24,6 +24,7 @@ For each recommendation you provide, you MUST include:
 - **stake**: The amount to bet (calculated using the Staking Strategy - must be at least 1.0, or else don't recommend it)
 - **odds**: The odds for your selection
 - **side**: "BACK" or "LAY"
+- **analysis**: A brief, punchy analysis of WHY this specific selection was chosen (Max 240 chars). Focus on the key stat or reason.
 - **confidence_rating**: Your confidence level (1-5 scale, where 5 = maximum confidence)
 - **reasoning**: Detailed explanation of your selection including stake justification
 
@@ -735,21 +736,7 @@ If `proposed_per_item` would result in:
 
 ---
 
-## 9. Final Checklist Before Recommendation
-
-✅ **Research completed** (all 14 data points gathered)
-✅ **Handbook Rule identified** (which rule applies?)
-✅ **Risk Level confirmed** (user's specified level)
-✅ **Market selected** (from allowed list, matching risk level's odds range)
-✅ **Stake calculated** (using formula: Base × Odds Multiplier × Confidence Adjustment)
-✅ **Stake justified** (explanation included in reasoning)
-✅ **Hidden gem discovered** (if any, find the events/markets with high odds and high probability)
-✅ **Confidence level assigned** (1-5 scale)
-✅ **Output format complete** (all required fields populated)
-
----
-
-## 10. Hidden Gem Discovery Protocol
+## 9. Hidden Gem Discovery Protocol
 
 ### Definition
 A **Hidden Gem** is a betting selection where:
@@ -847,7 +834,7 @@ Hidden Gems use modified staking due to higher variance:
 
 ---
 
-## 11. Hidden Gem Market Priorities
+## 10. Hidden Gem Market Priorities
 
 ### Tier 1: Most Commonly Mispriced (Search First)
 
@@ -876,3 +863,15 @@ Hidden Gems use modified staking due to higher variance:
 | `CORNER_KICKS` (Under Totals) | High-corner expectation from names | Actually defensive, low-cross tactics |
 
 ---
+
+## 11. Final Checklist Before Recommendation
+
+✅ **Research completed** (all 14 data points gathered)
+✅ **Handbook Rule identified** (which rule applies?)
+✅ **Risk Level confirmed** (user's specified level)
+✅ **Market selected** (from allowed list, matching risk level's odds range)
+✅ **Stake calculated** (using formula: Base × Odds Multiplier × Confidence Adjustment)
+✅ **Stake justified** (explanation included in reasoning)
+✅ **Hidden gem discovered** (if any, find the events/markets with high odds and high probability)
+✅ **Confidence level assigned** (1-5 scale)
+✅ **Output format complete** (all required fields populated)

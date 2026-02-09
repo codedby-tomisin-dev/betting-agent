@@ -1,6 +1,6 @@
 import { httpsCallable } from "firebase/functions";
 import { functions } from "./firebase";
-import { BetSelectionItem, Bet } from "@/shared/types";
+import { BetSelectionItem, Bet, BetEvent } from "@/shared/types";
 
 /**
  * Approve a bet intent and queue it for placement
@@ -35,4 +35,79 @@ export const getBetHistory = async (
     const getHistory = httpsCallable(functions, 'get_bet_history');
     const result = await getHistory({ limit, start_after_id: startAfterId, status, date_range: dateRange });
     return result.data as { items: Bet[], last_doc_id: string | null };
+};
+
+/**
+ * Fetch all upcoming games from the backend
+ */
+export const fetchUpcomingGames = async (date?: string) => {
+    const isDev = typeof window !== "undefined" && window.location.hostname === "localhost";
+    const projectId = "skilful-sphere-392008"; // Could be moved to config/constants
+    const region = "europe-west2";
+
+    const baseUrl = isDev
+        ? `http://127.0.0.1:5001/${projectId}/${region}`
+        : `https://${region}-${projectId}.cloudfunctions.net`;
+
+    let url = `${baseUrl}/get_upcoming_games`;
+    if (date) {
+        url += `?date=${date}`;
+    }
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const result = await response.json();
+        // Ensure we're returning the data array from the response { status: "success", data: [...] }
+        return (result.data || []) as import('@/shared/types').BetEvent[];
+    } catch (error) {
+        console.error("Failed to fetch upcoming games:", error);
+        // Return empty array on error to not break UI
+        return [];
+    }
+};
+
+/**
+ * Request AI analysis for a single game
+ */
+export const analyzeSingleGame = async (
+    game: BetEvent,
+    budget?: number,
+    risk_appetite?: number
+) => {
+    const isDev = typeof window !== "undefined" && window.location.hostname === "localhost";
+    const projectId = "skilful-sphere-392008";
+    const region = "europe-west2";
+
+    const baseUrl = isDev
+        ? `http://127.0.0.1:5001/${projectId}/${region}`
+        : `https://${region}-${projectId}.cloudfunctions.net`;
+
+    const url = `${baseUrl}/analyze_bets`;
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                events: [game],
+                budget,
+                risk_appetite
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        return result.data;
+    } catch (error) {
+        console.error("Failed to analyze game:", error);
+        throw error;
+    }
 };

@@ -5,6 +5,7 @@ export * from './BetApprovalView';
 export * from './BetSelectionGroup';
 export * from './PendingBetCard';
 export * from './RecentBetCard';
+export * from './RecentActivityRow';
 export * from './RecentBetsListView';
 export { BetTotalsDisplay } from './BetTotalsDisplay';
 export { AddMarketDialog } from './AddMarketDialog';

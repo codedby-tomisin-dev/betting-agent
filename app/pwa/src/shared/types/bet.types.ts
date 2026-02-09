@@ -1,7 +1,7 @@
 import { Timestamp } from 'firebase/firestore';
 
 /**
- * Unified bet status - superset of all possible statuses
+ * Unified bet status
  */
 export type BetStatus =
     | 'intent'
@@ -16,45 +16,19 @@ export type BetStatus =
     | 'existing';
 
 /**
- * Individual bet selection item
+ * Competition reference
  */
-export interface BetSelectionItem {
-    event: string;
-    market: string;
-    odds: number;
-    stake: number;
-    market_id?: string;
-    selection_id?: string | number;
-    side?: string;
-    reasoning?: string;
+export interface Competition {
+    name: string;
 }
 
 /**
- * Wager totals for a bet
+ * Core event info - used by selections and full events
  */
-export interface BetWager {
-    odds: number;
-    stake: number;
-    potential_returns: number;
-}
-
-/**
- * Balance information for a bet
- */
-export interface BetBalance {
-    starting: number;
-    predicted?: number | null;
-    ending?: number | null;
-}
-
-/**
- * User preferences for bet analysis
- */
-export interface BetPreferences {
-    risk_appetite: number;
-    budget: number;
-    reliable_teams_only: boolean;
-    competitions: string[];
+export interface EventInfo {
+    name: string;
+    time: string;
+    competition: Competition;
 }
 
 /**
@@ -76,13 +50,52 @@ export interface MarketOption {
 }
 
 /**
- * Event with available markets
+ * Full event with available markets
  */
-export interface BetEvent {
-    event_name: string;
-    competition_name: string;
-    event_time: string;
+export interface BetEvent extends EventInfo {
     options?: MarketOption[];
+}
+
+/**
+ * Individual bet selection item
+ */
+export interface BetSelectionItem {
+    event: EventInfo;
+    market: string;
+    odds: number;
+    stake: number;
+    market_id?: string;
+    selection_id?: string | number;
+    side?: string;
+    reasoning?: string;
+}
+
+/**
+ * Wager totals
+ */
+export interface BetWager {
+    odds: number;
+    stake: number;
+    potential_returns: number;
+}
+
+/**
+ * Balance information
+ */
+export interface BetBalance {
+    starting: number;
+    predicted?: number | null;
+    ending?: number | null;
+}
+
+/**
+ * User preferences for bet analysis
+ */
+export interface BetPreferences {
+    risk_appetite: number;
+    budget: number;
+    reliable_teams_only: boolean;
+    competitions: string[];
 }
 
 /**
@@ -109,7 +122,6 @@ export interface SettlementResult {
 
 /**
  * Main Bet interface - single source of truth
- * Merged from Bet (api.ts) and BetSlip (types.ts)
  */
 export interface Bet {
     id: string;
@@ -135,20 +147,39 @@ export interface Bet {
 }
 
 /**
- * Grouped selection for UI display - selections grouped by event
+ * Market display item within a grouped selection
+ */
+export interface SelectionMarketItem {
+    market: string;
+    odds: number;
+    stake: number;
+    potential_returns: number;
+    market_id?: string;
+    selection_id?: string | number;
+    reasoning?: string;
+    stableId: string;
+    isOriginal: boolean;
+    originalIndex?: number;
+    addedIndex?: number;
+}
+
+/**
+ * Grouped selection for UI display
  */
 export interface SelectionEventGroup {
-    event: string;
-    markets: Array<{
-        market: string;
-        odds: number;
-        stake: number;
-        potential_returns: number;
-        market_id?: string;
-        selection_id?: string | number;
-        stableId: string;
-        isOriginal: boolean;
-        originalIndex?: number;
-        addedIndex?: number;
-    }>;
+    event: EventInfo;
+    markets: SelectionMarketItem[];
+}
+
+/**
+ * AI Analysis Response
+ */
+export interface AIAnalysisResponse {
+    total_stake: number;
+    total_returns: number;
+    selections: {
+        items: BetSelectionItem[];
+        wager: BetWager;
+    };
+    overall_reasoning: string;
 }

@@ -54,8 +54,6 @@ class BetfairExchange(BaseBettingPlatform):
             "points_balance": account_funds.points_balance
         }
 
-
-
     def search_market(self, sport: str, competitions: List[str] = [], market_type_codes: Optional[List[str]] = None, text_query: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Search for markets given a sport.
@@ -146,9 +144,11 @@ class BetfairExchange(BaseBettingPlatform):
 
             if event_key not in events_grouped:
                 events_grouped[event_key] = {
-                    'event_name': market.event.name,
-                    'event_time': market.market_start_time,
-                    'competition_name': market.competition.name if market.competition else None,
+                    'name': market.event.name,
+                    'time': market.market_start_time,
+                    'competition': {
+                        'name': market.competition.name if market.competition else None
+                    },
                     'options': []
                 }
 

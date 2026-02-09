@@ -15,8 +15,26 @@ class Option(BaseModel):
     options: List[Selection]
 
 
+class Competition(BaseModel):
+    name: str
+
+
 class Event(BaseModel):
-    event_name: str
-    event_time: datetime
-    competition_name: Optional[str] = None
+    """Event with nested structure matching frontend EventInfo"""
+    name: str
+    time: datetime
+    competition: Competition
     options: List[Option]
+
+    # Legacy field accessors for backwards compatibility during migration
+    @property
+    def event_name(self) -> str:
+        return self.name
+    
+    @property
+    def event_time(self) -> datetime:
+        return self.time
+    
+    @property
+    def competition_name(self) -> str:
+        return self.competition.name

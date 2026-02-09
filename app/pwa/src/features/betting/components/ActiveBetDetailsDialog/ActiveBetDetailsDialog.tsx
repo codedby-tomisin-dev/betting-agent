@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
     Dialog,
     DialogContent,
@@ -8,12 +9,13 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Bet } from "@/shared/types";
+import { Bet, BetSelectionItem, EventInfo } from "@/shared/types";
 import { BetMetadata } from "./BetMetadata";
 import { BetAIReasoning } from "../BetAIReasoning";
 import { BetSelectionsList } from "./BetSelectionsList";
 import { BetWagerTotals } from "./BetWagerTotals";
 import { BetPlacementResults } from "./BetPlacementResults";
+import { getEventId } from "../../models/BetSelectionModel";
 
 interface ActiveBetDetailsDialogProps {
     bet: Bet | null;
@@ -24,14 +26,24 @@ interface ActiveBetDetailsDialogProps {
 export function ActiveBetDetailsDialog({ bet, isOpen, onClose }: ActiveBetDetailsDialogProps) {
     if (!bet) return null;
 
-    const selections = bet.selections?.items || [];
-    const groupedByEvent = selections.reduce((acc, selection) => {
-        if (!acc[selection.event]) {
-            acc[selection.event] = [];
-        }
-        acc[selection.event].push(selection);
-        return acc;
-    }, {} as Record<string, typeof selections>);
+    const groupedByEvent = useMemo(() => {
+        if (!bet.selections?.items) return [];
+
+        const groups: Record<string, { event: EventInfo; selections: BetSelectionItem[] }> = {};
+
+        bet.selections.items.forEach((item) => {
+            const eventId = getEventId(item.event);
+            if (!groups[eventId]) {
+                groups[eventId] = {
+                    event: item.event,
+                    selections: []
+                };
+            }
+            groups[eventId].selections.push(item);
+        });
+
+        return Object.values(groups);
+    }, [bet.selections?.items]);
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -49,13 +61,6 @@ export function ActiveBetDetailsDialog({ bet, isOpen, onClose }: ActiveBetDetail
                     <BetMetadata bet={bet} />
 
                     <Separator />
-
-                    {bet.ai_reasoning && (
-                        <>
-                            <BetAIReasoning reasoning={bet.ai_reasoning} defaultOpen={false} />
-                            <Separator />
-                        </>
-                    )}
 
                     <BetSelectionsList groupedByEvent={groupedByEvent} />
 

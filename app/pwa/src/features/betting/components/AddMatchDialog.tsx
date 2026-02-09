@@ -20,7 +20,7 @@ export function AddMatchDialog({
     onSelectMatch,
 }: AddMatchDialogProps) {
     const filteredEvents = availableEvents.filter(
-        e => !existingEventNames.includes(e.event_name)
+        e => !existingEventNames.includes(e.name)
     );
 
     return (
@@ -37,9 +37,9 @@ export function AddMatchDialog({
                     ) : (
                         filteredEvents.map((event, eventIdx) => (
                             <div key={eventIdx} className="border rounded-sm p-3 space-y-2">
-                                <p className="font-semibold text-sm">{event.event_name}</p>
+                                <p className="font-semibold text-sm">{event.name}</p>
                                 <p className="text-xs text-gray-500">
-                                    {event.competition_name} • {new Date(event.event_time).toLocaleString()}
+                                    {event.competition?.name} • {new Date(event.time).toLocaleString()}
                                 </p>
                                 {event.options?.map((option, optIdx) => (
                                     <div key={optIdx} className="space-y-2">

@@ -1,7 +1,11 @@
 import { Timestamp } from 'firebase/firestore';
 
-export function formatTimestamp(timestamp: Timestamp | Date | undefined): string {
+export function formatTimestamp(timestamp: Timestamp | Date | string | undefined): string {
     if (!timestamp) return 'N/A';
+
+    if (typeof timestamp === 'string') {
+        timestamp = new Date(timestamp);
+    }
 
     const date = timestamp instanceof Timestamp ? timestamp.toDate() : timestamp;
     return new Intl.DateTimeFormat('en-GB', {

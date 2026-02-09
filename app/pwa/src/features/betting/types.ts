@@ -4,9 +4,12 @@ export type {
     BetWager,
     BetBalance,
     BetEvent,
+    EventInfo,
     MarketOption,
     SelectionOption,
     SelectionEventGroup,
+    SelectionMarketItem,
+    Competition,
     BetStatus,
 } from '@/shared/types';
 
@@ -15,16 +18,17 @@ export type {
  */
 export interface AddedSelectionItem {
     id: string;
-    event: string;
+    event: import('@/shared/types').EventInfo;
     market: string;
     odds: number;
     stake: number;
-    market_id?: string;
-    selection_id?: string | number;
+    market_id: string;
+    selection_id: string | number;
+    reasoning?: string;
 }
 
 /**
- * State for bet modifications (stakes, added/removed selections)
+ * State for bet modifications
  */
 export interface BetModificationState {
     editedStakes: Record<string, number>;
