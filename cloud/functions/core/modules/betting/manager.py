@@ -525,6 +525,144 @@ class BettingManager:
         self.repo.update_bet(bet_id, update_data)
         logger.info(f"Updated bet {bet_id} with placement results")
 
+    def create_and_place_bet(self, request: PlaceBetRequest) -> Dict[str, Any]:
+        """
+        Creates a bet slip document and immediately places the bet.
+        Used for manual bet placement from the frontend.
+        
+        Args:
+            request: PlaceBetRequest containing list of bet orders
+            
+        Returns:
+            Dictionary with bet placement results
+        """
+        logger.info("Starting manual bet creation and placement")
+        
+        # 1. Create the bet document
+        try:
+            # Group bets by event if possible, or just use a generic event description
+            # For manual bets, we might not have full event details in the request
+            # We'll construct a basic structure
+            
+            # Calculate totals
+            total_stake = sum(bet.stake for bet in request.bets)
+            potential_returns = sum(bet.stake * bet.odds for bet in request.bets)
+            
+            # Get current balance for tracking
+            balance_info = self.get_balance()
+            starting_balance = balance_info.get("available_balance", 0)
+            
+            # Create selections list for Firestore
+            selections_items = []
+            events_data = []
+            
+            for bet in request.bets:
+                event_info = bet.event or {}
+                
+                if event_info and event_info.get("name"):
+                   if not any(e.get("name") == event_info.get("name") for e in events_data):
+                       events_data.append(event_info)
+
+                selections_items.append({
+                    "market_id": bet.market_id,
+                    "selection_id": bet.selection_id,
+                    "stake": bet.stake,
+                    "odds": bet.odds,
+                    "side": bet.side or "BACK",
+                    # Map selection_name to market to match automated structure (e.g. "Under 4.5")
+                    "market": bet.selection_name or bet.market_name or "Unknown Market",
+                    "event": event_info,
+                    "status": "pending_placement"
+                })
+                
+            intent_data = {
+                "target_date": datetime.now(timezone.utc).date().isoformat(),
+                "status": "ready", # Skip 'intent' and 'analyzed', go straight to ready
+                "created_at": admin_firestore.SERVER_TIMESTAMP,
+                "approved_at": admin_firestore.SERVER_TIMESTAMP,
+                "source": "manual",
+                "preferences": {
+                    "type": "manual_slip"
+                },
+                "balance": {
+                    "starting": starting_balance,
+                    "predicted": None,
+                    "ending": None
+                },
+                "selections": {
+                    "items": selections_items,
+                    "wager": {
+                        "odds": 0, # Complex to calc accurately without more info
+                        "stake": total_stake,
+                        "potential_returns": potential_returns
+                    }
+                },
+                "events": events_data
+            }
+            
+            bet_doc = self.repo.create_bet_intent(intent_data)
+            bet_id = bet_doc.get("id")
+            logger.info(f"Created manual bet document: {bet_id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to create manual bet document: {e}")
+            raise e
+
+        # 2. Place the bet
+        try:
+            # We can reuse place_bet or call betfair directly
+            # Let's use the existing place_bet logic which handles the API call
+            
+            # Note: The existing place_bet returns {status: ..., bets: [...]}
+            placement_result = self.place_bet(request)
+            
+            # 3. Update the document with results
+            status = "placed" if placement_result.get("status") == "SUCCESS" else "failed"
+            if placement_result.get("status") == "PARTIAL_FAILURE":
+                status = "partial"
+                
+            # Update items with individual results
+            updated_items = []
+            placed_bets = placement_result.get("bets", [])
+            
+            # Map results back to items - assuming order is preserved
+            # A more robust way would be to match by selection_id/market_id
+            
+            for i, item in enumerate(selections_items):
+                # Find matching result
+                match = next((r for r in placed_bets if r.get("selection_id") == item["selection_id"] and r.get("market_id") == item["market_id"]), None)
+                
+                if match:
+                    item["status"] = match.get("status")
+                    item["bet_id"] = match.get("bet_id")
+                    item["placed_at"] = datetime.now(timezone.utc)
+                    if match.get("error_code"):
+                        item["error_code"] = match.get("error_code")
+                
+                updated_items.append(item)
+
+            self.repo.update_bet(bet_id, {
+                "status": status,
+                "placed_at": datetime.now(timezone.utc),
+                "placement_results": placement_result,
+                "selections": {
+                    "items": updated_items,
+                    "wager": intent_data["selections"]["wager"]
+                }
+            })
+            
+            return placement_result
+            
+        except Exception as e:
+            logger.error(f"Failed to place manual bet {bet_id}: {e}")
+            # Mark as failed in DB
+            self.repo.update_bet(bet_id, {
+                "status": "failed", 
+                "error": str(e),
+                "failed_at": datetime.now(timezone.utc)
+            })
+            raise e
+
     def mark_bet_failed(self, bet_id: str, error: str) -> None:
         """
         Marks a bet document as failed.

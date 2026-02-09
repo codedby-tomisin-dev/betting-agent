@@ -44,5 +44,8 @@ class PlaceBetRequest(BaseModel):
         stake: float = Field(..., gte=1.0, description="Bet stake amount")
         odds: float = Field(..., gt=1.0, description="Bet odds")
         side: Optional[str] = Field("BACK", description="Bet side (BACK or LAY)")
+        market_name: Optional[str] = Field(None, description="Name of the market (e.g. Over 2.5 Goals)")
+        selection_name: Optional[str] = Field(None, description="Name of the selection (e.g. Under 4.5)")
+        event: Optional[dict] = Field(None, description="Event information {name, time, competition: {name}}")
     
     bets: List[BetOrder] = Field(..., min_length=1, description="List of bets to place")

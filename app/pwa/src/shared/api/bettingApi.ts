@@ -104,6 +104,13 @@ export interface PlaceBetOrder {
     stake: number;
     odds: number;
     side?: string;
+    market_name?: string;
+    selection_name?: string;
+    event?: {
+        name: string;
+        time: string;
+        competition: { name: string };
+    };
 }
 
 export const placeBets = async (bets: PlaceBetOrder[]) => {

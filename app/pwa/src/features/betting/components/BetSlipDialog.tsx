@@ -61,7 +61,16 @@ export function BetSlipDialog({ isOpen, onClose, onPlaceBets }: BetSlipDialogPro
                 selection_id: s.selection_id || '',
                 stake: s.stake,
                 odds: s.odds,
-                side: s.side || 'BACK'
+                side: s.side || 'BACK',
+                market_name: s.market_name, // Include market_name
+                selection_name: s.selection_name || s.market, // Include selection name, fallback to market string for AI bets
+                event: {
+                    name: s.event?.name || 'Unknown Event',
+                    time: s.event?.time || '',
+                    competition: {
+                        name: s.event?.competition?.name || 'Unknown Competition'
+                    }
+                }
             }));
 
             const result = await onPlaceBets(bets);

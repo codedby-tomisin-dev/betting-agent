@@ -22,6 +22,8 @@ export interface AddedSelectionItem {
     market: string;
     odds: number;
     stake: number;
+    market_name?: string;
+    selection_name?: string;
     market_id: string;
     selection_id: string | number;
     reasoning?: string;

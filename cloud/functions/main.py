@@ -334,7 +334,7 @@ def place_bet(req: https_fn.Request) -> https_fn.Response:
                 status=400
             )
         
-        result = BettingManager().place_bet(request=request_data)
+        result = BettingManager().create_and_place_bet(request=request_data)
         return make_success_response(result)
     except ValidationError as e:
         logger.error(f"Place bet validation error: {e}")

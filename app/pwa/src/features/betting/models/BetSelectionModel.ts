@@ -10,16 +10,23 @@ export interface LegacyEventData {
     options?: MarketOption[];
 }
 
-export function parseEventInfo(data: LegacyEventData | EventInfo): EventInfo {
+export function parseEventInfo(data: LegacyEventData | EventInfo | undefined | null): EventInfo {
+    if (!data) {
+        return {
+            name: 'Unknown Event',
+            time: '',
+            competition: { name: 'Unknown Competition' }
+        };
+    }
     if ('name' in data && 'time' in data && 'competition' in data && data.competition) {
         return data as EventInfo;
     }
     const legacy = data as LegacyEventData;
     return {
-        name: legacy.event_name || legacy.name || '',
+        name: legacy.event_name || legacy.name || 'Unknown Event',
         time: legacy.event_time || legacy.time || '',
         competition: {
-            name: legacy.competition_name || legacy.competition?.name || ''
+            name: legacy.competition_name || legacy.competition?.name || 'Unknown Competition'
         }
     };
 }

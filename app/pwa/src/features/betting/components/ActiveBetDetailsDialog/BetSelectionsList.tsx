@@ -15,9 +15,9 @@ export function BetSelectionsList({ groupedByEvent }: BetSelectionsListProps) {
                 <div key={groupIdx} className="space-y-4">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h4 className="font-semibold text-gray-900">{group.event.name}</h4>
+                            <h4 className="font-semibold text-gray-900">{group.event?.name || 'Unknown Event'}</h4>
                             <p className="text-xs text-gray-500">
-                                {group.event.competition.name} • {formatTimestamp(group.event.time)}
+                                {group.event?.competition?.name || 'Unknown Competition'} • {formatTimestamp(group.event?.time || '')}
                             </p>
                         </div>
                     </div>

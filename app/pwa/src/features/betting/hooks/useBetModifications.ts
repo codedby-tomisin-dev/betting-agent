@@ -41,6 +41,8 @@ export function useBetModifications(bet: Bet) {
                 }
             },
             market: selection.name,
+            market_name: market.name,
+            selection_name: selection.name,
             odds: selection.odds,
             stake: 10,
             market_id: market.market_id,
@@ -60,6 +62,8 @@ export function useBetModifications(bet: Bet) {
             id: crypto.randomUUID(),
             event: event,
             market: selection.name,
+            market_name: market.name,
+            selection_name: selection.name,
             odds: selection.odds,
             stake: 10,
             market_id: market.market_id,

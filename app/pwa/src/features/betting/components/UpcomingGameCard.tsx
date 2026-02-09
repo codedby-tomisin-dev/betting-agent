@@ -51,6 +51,8 @@ export function UpcomingGameCard({
                 competition: event.competition || { name: '' }
             },
             market: `${market.name}: ${selection.name}`,
+            market_name: market.name,
+            selection_name: selection.name,
             market_id: market.market_id,
             selection_id: selection.selection_id,
             odds: selection.odds,
