@@ -1,6 +1,6 @@
 import { BetSelectionItem, SelectionEventGroup, EventInfo } from '@/shared/types';
 import { AddedSelectionItem } from '../types';
-import { getEventId, parseEventInfo } from '../models/BetSelectionModel';
+import { getEventId, parseEventInfo, LegacyEventData } from '../models/BetSelectionModel';
 
 interface ItemWithMetadata {
     event: EventInfo;
@@ -27,7 +27,7 @@ export function groupSelectionsByEvent(
     const originalWithMetadata: ItemWithMetadata[] = originalItems
         .filter((_, idx) => !removedIndices.has(idx))
         .map((item, idx) => ({
-            event: parseEventInfo(item.event as any),
+            event: parseEventInfo(item.event as LegacyEventData | EventInfo),
             market: item.market,
             odds: item.odds,
             stake: item.stake,

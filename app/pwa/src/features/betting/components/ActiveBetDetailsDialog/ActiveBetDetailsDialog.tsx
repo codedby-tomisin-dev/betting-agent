@@ -11,7 +11,6 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Bet, BetSelectionItem, EventInfo } from "@/shared/types";
 import { BetMetadata } from "./BetMetadata";
-import { BetAIReasoning } from "../BetAIReasoning";
 import { BetSelectionsList } from "./BetSelectionsList";
 import { BetWagerTotals } from "./BetWagerTotals";
 import { BetPlacementResults } from "./BetPlacementResults";
@@ -24,10 +23,8 @@ interface ActiveBetDetailsDialogProps {
 }
 
 export function ActiveBetDetailsDialog({ bet, isOpen, onClose }: ActiveBetDetailsDialogProps) {
-    if (!bet) return null;
-
     const groupedByEvent = useMemo(() => {
-        if (!bet.selections?.items) return [];
+        if (!bet?.selections?.items) return [];
 
         const groups: Record<string, { event: EventInfo; selections: BetSelectionItem[] }> = {};
 
@@ -43,7 +40,9 @@ export function ActiveBetDetailsDialog({ bet, isOpen, onClose }: ActiveBetDetail
         });
 
         return Object.values(groups);
-    }, [bet.selections?.items]);
+    }, [bet?.selections?.items]);
+
+    if (!bet) return null;
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>

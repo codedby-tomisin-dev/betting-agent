@@ -1,13 +1,13 @@
-import { BetSelectionItem, EventInfo, BetEvent } from "@/shared/types";
+import { BetSelectionItem, EventInfo, BetEvent, MarketOption } from "@/shared/types";
 
-interface LegacyEventData {
+export interface LegacyEventData {
     name?: string;
     time?: string;
     competition?: { name: string };
     event_name?: string;
     event_time?: string;
     competition_name?: string;
-    options?: any[];
+    options?: MarketOption[];
 }
 
 export function parseEventInfo(data: LegacyEventData | EventInfo): EventInfo {
@@ -41,7 +41,7 @@ export class BetSelectionModel {
 
     get event(): EventInfo {
         // Use parser to handle legacy data
-        return parseEventInfo(this.selection.event as any);
+        return parseEventInfo(this.selection.event as LegacyEventData | EventInfo);
     }
 
     get eventName(): string {
@@ -93,6 +93,6 @@ export class BetSelectionModel {
  * Generate unique ID for an event
  */
 export function getEventId(event: EventInfo | LegacyEventData): string {
-    const parsed = parseEventInfo(event as any);
+    const parsed = parseEventInfo(event);
     return `${parsed.name}_${parsed.time}`;
 }

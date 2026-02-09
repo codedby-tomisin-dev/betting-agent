@@ -1,12 +1,12 @@
-import { BetSelectionItem } from "@/shared/types";
-import { parseEventInfo } from "../models/BetSelectionModel";
+import { BetSelectionItem, EventInfo } from "@/shared/types";
+import { parseEventInfo, LegacyEventData } from "../models/BetSelectionModel";
 
 export function formatBetTitle(selections: BetSelectionItem[] | undefined): string {
     if (!selections || selections.length === 0) {
         return "No selections";
     }
 
-    const firstEvent = parseEventInfo(selections[0].event as any);
+    const firstEvent = parseEventInfo(selections[0].event as LegacyEventData | EventInfo);
     const otherCount = selections.length - 1;
 
     if (otherCount > 0) {
