@@ -12,10 +12,19 @@ import { SelectionReasoning } from "./SelectionReasoning";
 import { PlaceBetOrder } from "@/shared/api/bettingApi";
 import { toast } from "sonner";
 
+interface PlaceBetsResponse {
+    status: string;
+    data?: {
+        status: string;
+        bets: Array<{ status: string; market_id: string; selection_id: number; bet_id?: string; error_code?: string }>;
+    };
+    message?: string;
+}
+
 interface BetSlipDialogProps {
     isOpen: boolean;
     onClose: () => void;
-    onPlaceBets: (bets: PlaceBetOrder[]) => Promise<{ data?: Array<{ status: string }>; message?: string }>;
+    onPlaceBets: (bets: PlaceBetOrder[]) => Promise<PlaceBetsResponse>;
 }
 
 export function BetSlipDialog({ isOpen, onClose, onPlaceBets }: BetSlipDialogProps) {
@@ -47,7 +56,6 @@ export function BetSlipDialog({ isOpen, onClose, onPlaceBets }: BetSlipDialogPro
         setPlacementResult(null);
 
         try {
-            // Transform selections to bet orders
             const bets = selections.map(s => ({
                 market_id: s.market_id || '',
                 selection_id: s.selection_id || '',
@@ -58,9 +66,9 @@ export function BetSlipDialog({ isOpen, onClose, onPlaceBets }: BetSlipDialogPro
 
             const result = await onPlaceBets(bets);
 
-            // Check if any bets were successfully placed
-            const successCount = result.data?.filter((r: { status: string }) => r.status === 'SUCCESS').length || 0;
-            const failCount = (result.data?.length || 0) - successCount;
+            const betResults = result.data?.bets || [];
+            const successCount = betResults.filter(r => r.status === 'SUCCESS').length;
+            const failCount = betResults.length - successCount;
 
             if (successCount > 0) {
                 setPlacementResult({
@@ -71,7 +79,6 @@ export function BetSlipDialog({ isOpen, onClose, onPlaceBets }: BetSlipDialogPro
                 });
                 toast.success(`Bet placed successfully!`);
 
-                // Clear slip after successful placement
                 setTimeout(() => {
                     clearSlip();
                     onClose();
