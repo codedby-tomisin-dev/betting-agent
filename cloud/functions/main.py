@@ -277,11 +277,6 @@ def place_bet_on_ready(event: firestore_fn.Event[firestore_fn.Change[firestore_f
             pass
 
 
-@scheduler_fn.on_schedule(schedule='*/2 * * * *')
-def on_schedule_example(event: scheduler_fn.ScheduledEvent) -> None:
-    print(f"This will be run every hour using {event}")
-
-
 @https_fn.on_request(cors=cors_options)
 def on_request_example(req: https_fn.Request) -> https_fn.Response:
     return https_fn.Response("Hello world!")
@@ -349,7 +344,7 @@ def place_bet(req: https_fn.Request) -> https_fn.Response:
         return make_error_response(str(e))
 
 
-@https_fn.on_request(cors=cors_options)
+@https_fn.on_call(cors=cors_options)
 def get_balance(req: https_fn.Request) -> https_fn.Response:
     """Get wallet balance from Betfair Exchange."""
     try:
@@ -440,10 +435,10 @@ def check_bet_results(req: https_fn.Request) -> https_fn.Response:
         return make_error_response(str(e))
 
 
-@scheduler_fn.on_schedule(schedule='0 */2 * * *', timeout_sec=300, memory=options.MemoryOption.GB_1)
+@scheduler_fn.on_schedule(schedule='*/30 * * * *', timeout_sec=300, memory=options.MemoryOption.GB_1)
 def automated_check_bet_results(event: scheduler_fn.ScheduledEvent) -> None:
     """
-    Automated scheduler to check bet results every 2 hours.
+    Automated scheduler to check bet results every 30 minutes.
     """
     try:
         logger.info("Automated bet results check triggered")
@@ -518,4 +513,48 @@ def get_bet_history(req: https_fn.CallableRequest) -> Any:
     except Exception as e:
         logger.error(f"Error fetching bet history: {e}", exc_info=True)
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message=str(e))
+
+
+@https_fn.on_request(cors=cors_options)
+def migrate_bet_slips(req: https_fn.Request) -> https_fn.Response:
+    """
+    Run migration on bet_slips documents to convert from legacy to new format.
+    
+    Query params:
+        dry_run: If 'false', actually update documents (default: 'true')
+        doc_id: If provided, migrate only this single document
+    """
+    try:
+        from core.migrations.migrate_bet_slips import run_migration, migrate_single_document
+        import json
+        
+        # Parse params from query string or JSON body
+        if req.method == "POST" and req.is_json:
+            data = req.get_json() or {}
+        else:
+            data = {}
+        
+        # Query params override body
+        dry_run_param = req.args.get("dry_run", data.get("dry_run", "true"))
+        dry_run = dry_run_param.lower() != "false" if isinstance(dry_run_param, str) else dry_run_param
+        doc_id = req.args.get("doc_id", data.get("doc_id"))
+        
+        if doc_id:
+            result = migrate_single_document(doc_id, dry_run=dry_run)
+        else:
+            result = run_migration(dry_run=dry_run)
+        
+        return https_fn.Response(
+            json.dumps(result, default=str),
+            status=200,
+            content_type="application/json"
+        )
+    except Exception as e:
+        logger.error(f"Error running migration: {e}", exc_info=True)
+        import json
+        return https_fn.Response(
+            json.dumps({"error": str(e)}),
+            status=500,
+            content_type="application/json"
+        )
 

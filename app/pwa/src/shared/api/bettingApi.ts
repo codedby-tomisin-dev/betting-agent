@@ -111,3 +111,47 @@ export const analyzeSingleGame = async (
         throw error;
     }
 };
+
+/**
+ * Place bets on Betfair Exchange
+ */
+export interface PlaceBetOrder {
+    market_id: string;
+    selection_id: string | number;
+    stake: number;
+    odds: number;
+    side?: string;
+}
+
+export const placeBets = async (bets: PlaceBetOrder[]) => {
+    const isDev = typeof window !== "undefined" && window.location.hostname === "localhost";
+    const projectId = "skilful-sphere-392008";
+    const region = "europe-west2";
+
+    const baseUrl = isDev
+        ? `http://127.0.0.1:5001/${projectId}/${region}`
+        : `https://${region}-${projectId}.cloudfunctions.net`;
+
+    const url = `${baseUrl}/place_bet`;
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ bets }),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || `HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        return result;
+    } catch (error) {
+        console.error("Failed to place bets:", error);
+        throw error;
+    }
+};

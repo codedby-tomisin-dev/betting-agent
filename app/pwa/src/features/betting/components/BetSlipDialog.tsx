@@ -1,22 +1,26 @@
 "use client";
 
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useBetSlip } from "../context/BetSlipContext";
 import { formatCurrency } from "@/shared/utils";
-import { X, Trash2 } from "lucide-react";
+import { X, Trash2, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { formatTimestamp } from "../utils/formatBetMetadata";
 import { SelectionReasoning } from "./SelectionReasoning";
+import { placeBets } from "@/shared/api/bettingApi";
+import { toast } from "sonner";
 
 interface BetSlipDialogProps {
     isOpen: boolean;
     onClose: () => void;
-    onPlaceBet?: () => void;
 }
 
-export function BetSlipDialog({ isOpen, onClose, onPlaceBet }: BetSlipDialogProps) {
+export function BetSlipDialog({ isOpen, onClose }: BetSlipDialogProps) {
     const { selections, removeSelection, updateStake, clearSlip, totalStake, totalReturns } = useBetSlip();
+    const [isPlacing, setIsPlacing] = useState(false);
+    const [placementResult, setPlacementResult] = useState<{ success: boolean; message: string } | null>(null);
 
     // Group selections by event for display (similar to BetSelectionGroup)
     const groupedByEvent = selections.reduce((acc, sel) => {
@@ -28,13 +32,82 @@ export function BetSlipDialog({ isOpen, onClose, onPlaceBet }: BetSlipDialogProp
         return acc;
     }, {} as Record<string, { event: typeof selections[0]['event']; items: typeof selections }>);
 
+    const handlePlaceBet = async () => {
+        if (selections.length === 0) return;
+
+        // Validate all stakes are > 0
+        const invalidSelections = selections.filter(s => s.stake <= 0);
+        if (invalidSelections.length > 0) {
+            toast.error("Please enter a stake for all selections (minimum £1)");
+            return;
+        }
+
+        setIsPlacing(true);
+        setPlacementResult(null);
+
+        try {
+            // Transform selections to bet orders
+            const bets = selections.map(s => ({
+                market_id: s.market_id || '',
+                selection_id: s.selection_id || '',
+                stake: s.stake,
+                odds: s.odds,
+                side: s.side || 'BACK'
+            }));
+
+            const result = await placeBets(bets);
+
+            // Check if any bets were successfully placed
+            const successCount = result.data?.filter((r: { status: string }) => r.status === 'SUCCESS').length || 0;
+            const failCount = (result.data?.length || 0) - successCount;
+
+            if (successCount > 0) {
+                setPlacementResult({
+                    success: true,
+                    message: failCount > 0
+                        ? `${successCount} bet(s) placed, ${failCount} failed`
+                        : `${successCount} bet(s) placed successfully!`
+                });
+                toast.success(`Bet placed successfully!`);
+
+                // Clear slip after successful placement
+                setTimeout(() => {
+                    clearSlip();
+                    onClose();
+                }, 2000);
+            } else {
+                setPlacementResult({
+                    success: false,
+                    message: result.message || "Failed to place bets"
+                });
+                toast.error("Failed to place bet");
+            }
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+            setPlacementResult({
+                success: false,
+                message: errorMessage
+            });
+            toast.error(`Error: ${errorMessage}`);
+        } finally {
+            setIsPlacing(false);
+        }
+    };
+
+    const handleClose = () => {
+        if (!isPlacing) {
+            setPlacementResult(null);
+            onClose();
+        }
+    };
+
     return (
-        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
             <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
                 <DialogHeader className="flex-shrink-0">
                     <div className="flex items-center justify-between">
                         <DialogTitle>Bet Slip ({selections.length})</DialogTitle>
-                        {selections.length > 0 && (
+                        {selections.length > 0 && !isPlacing && (
                             <Button
                                 variant="ghost"
                                 size="sm"
@@ -86,6 +159,7 @@ export function BetSlipDialog({ isOpen, onClose, onPlaceBet }: BetSlipDialogProp
                                                             className="w-16 h-6 text-sm border-0 bg-transparent p-0 focus-visible:ring-0 text-right font-semibold"
                                                             step="0.01"
                                                             min="0"
+                                                            disabled={isPlacing}
                                                         />
                                                     </div>
                                                     <Button
@@ -93,6 +167,7 @@ export function BetSlipDialog({ isOpen, onClose, onPlaceBet }: BetSlipDialogProp
                                                         size="sm"
                                                         className="h-8 w-8 p-0 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full"
                                                         onClick={() => removeSelection(item.id)}
+                                                        disabled={isPlacing}
                                                     >
                                                         <X className="h-4 w-4" />
                                                     </Button>
@@ -119,11 +194,33 @@ export function BetSlipDialog({ isOpen, onClose, onPlaceBet }: BetSlipDialogProp
                             <span className="text-gray-600">Potential Returns</span>
                             <span className="font-bold text-green-600">{formatCurrency(totalReturns)}</span>
                         </div>
+
+                        {placementResult && (
+                            <div className={`flex items-center gap-2 p-3 rounded-lg ${placementResult.success
+                                    ? 'bg-green-50 text-green-700'
+                                    : 'bg-red-50 text-red-700'
+                                }`}>
+                                {placementResult.success
+                                    ? <CheckCircle className="h-5 w-5" />
+                                    : <AlertCircle className="h-5 w-5" />
+                                }
+                                <span className="text-sm font-medium">{placementResult.message}</span>
+                            </div>
+                        )}
+
                         <Button
-                            className="w-full bg-pink-600 hover:bg-pink-700"
-                            onClick={onPlaceBet}
+                            className="w-full bg-pink-600 hover:bg-pink-700 disabled:bg-pink-300"
+                            onClick={handlePlaceBet}
+                            disabled={isPlacing || totalStake <= 0}
                         >
-                            Place Bet
+                            {isPlacing ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Placing Bet...
+                                </>
+                            ) : (
+                                'Place Bet'
+                            )}
                         </Button>
                     </div>
                 )}
@@ -131,3 +228,4 @@ export function BetSlipDialog({ isOpen, onClose, onPlaceBet }: BetSlipDialogProp
         </Dialog>
     );
 }
+
