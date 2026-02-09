@@ -41,27 +41,11 @@ export const getBetHistory = async (
  * Fetch all upcoming games from the backend
  */
 export const fetchUpcomingGames = async (date?: string) => {
-    const isDev = typeof window !== "undefined" && window.location.hostname === "localhost";
-    const projectId = "skilful-sphere-392008"; // Could be moved to config/constants
-    const region = "europe-west2";
-
-    const baseUrl = isDev
-        ? `http://127.0.0.1:5001/${projectId}/${region}`
-        : `https://${region}-${projectId}.cloudfunctions.net`;
-
-    let url = `${baseUrl}/get_upcoming_games`;
-    if (date) {
-        url += `?date=${date}`;
-    }
-
     try {
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const result = await response.json();
-        // Ensure we're returning the data array from the response { status: "success", data: [...] }
-        return (result.data || []) as import('@/shared/types').BetEvent[];
+        const getGames = httpsCallable(functions, 'get_upcoming_games');
+        const result = await getGames({ date });
+        // The callable returns { data: [...] } from the function
+        return (result.data || []) as BetEvent[];
     } catch (error) {
         console.error("Failed to fetch upcoming games:", error);
         // Return empty array on error to not break UI

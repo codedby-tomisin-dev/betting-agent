@@ -468,8 +468,8 @@ def save_settings(req: https_fn.CallableRequest) -> Any:
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message=str(e))
 
 
-@https_fn.on_request(cors=cors_options)
-def get_upcoming_games(req: https_fn.Request) -> https_fn.Response:
+@https_fn.on_call(cors=cors_options)
+def get_upcoming_games(req: https_fn.CallableRequest) -> Any:
     """
     Get all upcoming games based on user settings.
     """
