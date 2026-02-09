@@ -9,15 +9,16 @@ import { formatCurrency } from "@/shared/utils";
 import { X, Trash2, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { formatTimestamp } from "../utils/formatBetMetadata";
 import { SelectionReasoning } from "./SelectionReasoning";
-import { placeBets } from "@/shared/api/bettingApi";
+import { PlaceBetOrder } from "@/shared/api/bettingApi";
 import { toast } from "sonner";
 
 interface BetSlipDialogProps {
     isOpen: boolean;
     onClose: () => void;
+    onPlaceBets: (bets: PlaceBetOrder[]) => Promise<{ data?: Array<{ status: string }>; message?: string }>;
 }
 
-export function BetSlipDialog({ isOpen, onClose }: BetSlipDialogProps) {
+export function BetSlipDialog({ isOpen, onClose, onPlaceBets }: BetSlipDialogProps) {
     const { selections, removeSelection, updateStake, clearSlip, totalStake, totalReturns } = useBetSlip();
     const [isPlacing, setIsPlacing] = useState(false);
     const [placementResult, setPlacementResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -55,7 +56,7 @@ export function BetSlipDialog({ isOpen, onClose }: BetSlipDialogProps) {
                 side: s.side || 'BACK'
             }));
 
-            const result = await placeBets(bets);
+            const result = await onPlaceBets(bets);
 
             // Check if any bets were successfully placed
             const successCount = result.data?.filter((r: { status: string }) => r.status === 'SUCCESS').length || 0;
@@ -197,8 +198,8 @@ export function BetSlipDialog({ isOpen, onClose }: BetSlipDialogProps) {
 
                         {placementResult && (
                             <div className={`flex items-center gap-2 p-3 rounded-lg ${placementResult.success
-                                    ? 'bg-green-50 text-green-700'
-                                    : 'bg-red-50 text-red-700'
+                                ? 'bg-green-50 text-green-700'
+                                : 'bg-red-50 text-red-700'
                                 }`}>
                                 {placementResult.success
                                     ? <CheckCircle className="h-5 w-5" />

@@ -12,6 +12,7 @@ import { UpcomingGameCard } from "./UpcomingGameCard";
 import { BetSlipProvider } from "../context/BetSlipContext";
 import { BetSlipFab } from "./BetSlipFab";
 import { BetSlipDialog } from "./BetSlipDialog";
+import { placeBets } from "@/shared/api/bettingApi";
 
 interface BetApprovalContainerProps {
     bets: Bet[];
@@ -45,12 +46,6 @@ export function BetApprovalContainer({ bets }: BetApprovalContainerProps) {
         if (selectedBetId === betId) {
             setSelectedBetId(null);
         }
-    };
-
-    const handlePlaceBet = () => {
-        // TODO: Wire up to actual bet placement flow
-        console.log("Place bet from slip");
-        setIsBetSlipOpen(false);
     };
 
     return (
@@ -110,7 +105,7 @@ export function BetApprovalContainer({ bets }: BetApprovalContainerProps) {
                 <BetSlipDialog
                     isOpen={isBetSlipOpen}
                     onClose={() => setIsBetSlipOpen(false)}
-                    onPlaceBet={handlePlaceBet}
+                    onPlaceBets={placeBets}
                 />
             </section>
         </BetSlipProvider>
