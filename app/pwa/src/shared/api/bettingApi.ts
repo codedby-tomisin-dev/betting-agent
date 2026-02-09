@@ -44,11 +44,10 @@ export const fetchUpcomingGames = async (date?: string) => {
     try {
         const getGames = httpsCallable(functions, 'get_upcoming_games');
         const result = await getGames({ date });
-        // The callable returns { data: [...] } from the function
-        return (result.data || []) as BetEvent[];
+        const response = result.data as { status: string; data: BetEvent[] };
+        return response.data || [];
     } catch (error) {
         console.error("Failed to fetch upcoming games:", error);
-        // Return empty array on error to not break UI
         return [];
     }
 };

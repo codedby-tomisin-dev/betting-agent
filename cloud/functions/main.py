@@ -480,9 +480,10 @@ def get_upcoming_games(req: https_fn.CallableRequest) -> Any:
         result = manager.get_all_upcoming_games(sport="Soccer")
     except Exception as e:
         logger.error(f"Error fetching upcoming games: {e}", exc_info=True)
-        return make_error_response(str(e))
+        return make_error_response(str(e), as_dict=True)
 
-    return make_success_response(result)
+    return make_success_response(result, as_dict=True)
+
 
 @https_fn.on_call(cors=cors_options)
 def user_notifications(req: https_fn.CallableRequest) -> Any:
