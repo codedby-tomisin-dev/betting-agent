@@ -14,12 +14,19 @@ interface BalanceHistoryChartProps {
 export function BalanceHistoryChart({ bets }: BalanceHistoryChartProps) {
     const chartData = useMemo(() => {
         const data: ChartDataPoint[] = bets
-            .filter(b => b.status === "finished" && b.balance?.ending !== undefined)
-            .sort((a, b) => new Date(a.target_date).getTime() - new Date(b.target_date).getTime())
+            .filter(b => b.status === "finished" && b.balance?.ending !== undefined && b.finished_at)
+            .sort((a, b) => {
+                const dateA = a.finished_at instanceof Date ? a.finished_at : (a.finished_at as any).toDate();
+                const dateB = b.finished_at instanceof Date ? b.finished_at : (b.finished_at as any).toDate();
+                return dateA.getTime() - dateB.getTime();
+            })
             .map(b => {
                 const model = new BetModel(b);
+                // executed_at / finished_at
+                const date = b.finished_at instanceof Date ? b.finished_at : (b.finished_at as any).toDate();
+
                 return {
-                    date: format(new Date(b.target_date), "d MMM yyyy"),
+                    date: format(date, "d MMM yyyy"),
                     balance: model.endingBalance
                 };
             });
