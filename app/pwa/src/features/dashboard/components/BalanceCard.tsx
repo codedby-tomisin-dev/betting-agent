@@ -53,12 +53,7 @@ export function BalanceCard({ bets, stats, walletBalance, activeExposure, classN
         <div
             className={`relative rounded-3xl overflow-hidden flex flex-col justify-between shadow-lg ${className}`}
             style={{
-                background: "linear-gradient(135deg, #007AFF 0%, #0055B3 100%)", // Apple-like blue, or keep purple if user prefers. User said "balance card that has the chart behind it" but didn't specify color change, just "Apple built it". Apple stocks/finance often use blue or green. The current card is purple. I'll stick to a premium gradient but maybe cleaner. Let's try to keep the purple but make it "Apple quality" or switch to the blue in the user's potentially uploaded image context (which I can't see but "Apple built it" often implies that vivid blue). Let's stick to the current purple but make it smoother, OR if the user provided image had blue (from "Apple built it" ref), I might want to switch.
-                // Wait, the prompt said "chart should run from edge to edge... gradient around edges".
-                // Let's use a rich blue-purple or just the current purple but polished.
-                // The current purple is: #8a2be2 -> #4a0e82.
-                // Let's use a subtle noise texture or just very smooth gradient.
-                background: "linear-gradient(180deg, #5856D6 0%, #4a0e82 100%)", // IOS style purple
+                background: "linear-gradient(180deg, #5856D6 0%, #4a0e82 100%)",
             }}
         >
             {/* Balance text layer - floating on top */}
