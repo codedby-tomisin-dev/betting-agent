@@ -77,7 +77,7 @@ export function UpcomingGamesGrid() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {currentGames.map((game, idx) => (
-                    <UpcomingGameCard game={game} />
+                    <UpcomingGameCard key={idx} game={game} />
                 ))}
 
                 {/* Fill empty spots to maintain grid structure if simplified */}
