@@ -11,6 +11,7 @@ interface AIContextProps {
     onAddSelection?: (selection: BetSelectionItem) => void;
     isInSlip?: (marketId: string, selectionId: string | number) => boolean;
     className?: string;
+    hideTrigger?: boolean;
 }
 
 export function AIContext({
@@ -19,7 +20,8 @@ export function AIContext({
     onAnalyze,
     onAddSelection,
     isInSlip,
-    className
+    className,
+    hideTrigger
 }: AIContextProps) {
 
     // If we're loading, show a loading state
@@ -36,6 +38,8 @@ export function AIContext({
 
     // If no analysis yet, show button to request it
     if (!analysis) {
+        if (hideTrigger) return null;
+
         return (
             <div className={cn("mt-2 flex items-start max-w-full", className)}>
                 <button

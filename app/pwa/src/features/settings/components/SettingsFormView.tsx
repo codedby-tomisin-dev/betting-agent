@@ -79,7 +79,7 @@ export function SettingsFormView({
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-lg">
-                            <Wallet className="h-5 w-5 text-green-500" />
+                            <Wallet className="h-5 w-5 text-[#8a2be2]" />
                             Budget Strategy
                         </CardTitle>
                         <CardDescription>

@@ -120,7 +120,7 @@ export function BetSlipDialog({ isOpen, onClose, onPlaceBets }: BetSlipDialogPro
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-            <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+            <DialogContent className="max-w-lg max-h-[90vh] flex flex-col bg-white">
                 <DialogHeader className="flex-shrink-0">
                     <div className="flex items-center justify-between">
                         <DialogTitle>Bet Slip ({selections.length})</DialogTitle>

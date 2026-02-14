@@ -58,7 +58,7 @@ export function WinningsStackedBarChart({ bets }: WinningsStackedBarChartProps) 
                     />
                     <Legend />
                     <Bar dataKey="Stake" stackId="a" fill="#94a3b8" radius={[0, 0, 4, 4]} />
-                    <Bar dataKey="Net Profit" stackId="a" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Net Profit" stackId="a" fill="#8a2be2" radius={[4, 4, 0, 0]} />
                     {/* For losses, we might want to show them differently. 
                         If we stack, a "Loss" would reduce the height. 
                         Standard stacked charts with negatives can be tricky.

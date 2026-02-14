@@ -16,7 +16,7 @@ export function Sidebar() {
     return (
         <div className="hidden md:flex h-screen w-64 flex-col bg-transparent border-r border-gray-200/50 fixed left-0 top-0">
             <div className="flex h-16 items-center px-6">
-                <Bot className="h-8 w-8 text-green-600 mr-2" />
+                <Bot className="h-8 w-8 text-[#8a2be2] mr-2" />
                 <div>
                     <h1 className="text-lg font-bold leading-none text-gray-900">BetAgent</h1>
                 </div>
@@ -40,7 +40,7 @@ export function Sidebar() {
                                 <item.icon
                                     className={cn(
                                         "mr-3 h-5 w-5 flex-shrink-0 transition-colors",
-                                        isActive ? "text-green-600" : "text-gray-400 group-hover:text-gray-500"
+                                        isActive ? "text-[#8a2be2]" : "text-gray-400 group-hover:text-gray-500"
                                     )}
                                     aria-hidden="true"
                                 />

@@ -21,7 +21,7 @@ export default function RootLayout({
         <meta name="theme-color" content="#000000" />
       </head>
       <body
-        className={`${exo2.variable} antialiased bg-gray-100`} style={{ fontFamily: exo2.style.fontFamily }}
+        className={`${exo2.variable} antialiased bg-gray-50`} style={{ fontFamily: exo2.style.fontFamily }}
       >
         <Sidebar />
         <Header />

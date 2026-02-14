@@ -13,7 +13,7 @@ export function Header() {
         {/* Left side - Brand and Page title */}
         <div className="flex items-center gap-6">
           <div className="flex items-center">
-            <Bot className="h-8 w-8 text-green-600 mr-2" />
+            <Bot className="h-8 w-8 text-[#8a2be2] mr-2" />
             <h1 className="text-lg font-bold leading-none text-gray-900">BetAgent</h1>
           </div>
         </div>

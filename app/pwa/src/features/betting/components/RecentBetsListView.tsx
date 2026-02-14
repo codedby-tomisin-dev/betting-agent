@@ -67,9 +67,9 @@ export function RecentBetsListView({ bets }: RecentBetsListViewProps) {
 
     return (
         <>
-            <Card className="h-full border-none shadow-none">
+            <Card className="h-full bg-transparent border-0 shadow-none rounded-2xl">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
-                    <CardTitle className="text-xl">Recent Activity</CardTitle>
+                    <CardTitle className="text-xl font-[400] text-gray-900">Recent Activity</CardTitle>
                     <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-700 font-medium" asChild>
                         <Link href="/history">
                             View More <ArrowRight className="ml-2 h-4 w-4" />
@@ -93,7 +93,7 @@ export function RecentBetsListView({ bets }: RecentBetsListViewProps) {
                 <CardFooter className="flex items-center justify-center border-t pt-6 mt-2">
                     <div className="flex items-center gap-6 text-sm font-medium text-gray-600">
                         <span className="flex items-center gap-2">
-                            <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
+                            <span className="h-2.5 w-2.5 rounded-full bg-[#8a2be2]" />
                             {wins} Won
                         </span>
                         <span className="flex items-center gap-2">
