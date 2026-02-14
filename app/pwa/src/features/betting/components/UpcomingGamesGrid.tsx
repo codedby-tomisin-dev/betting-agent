@@ -28,10 +28,23 @@ export function UpcomingGamesGrid() {
 
     if (isLoading) {
         return (
-            <div className="h-full grid grid-cols-1 md:grid-cols-2 gap-4">
-                {Array.from({ length: 4 }).map((_, idx) => (
-                    <div key={`skel-${idx}`} className="h-48 bg-gray-50 rounded-2xl animate-pulse border border-gray-100" />
-                ))}
+            <div className="flex flex-col h-full space-y-4">
+                {/* Header skeleton matching actual header */}
+                <div className="flex items-center justify-between px-1">
+                    <div className="h-7 w-40 bg-gray-200 rounded animate-pulse" />
+                    <div className="flex items-center gap-1">
+                        <div className="h-8 w-8 bg-gray-100 rounded animate-pulse" />
+                        <div className="h-4 w-12 bg-gray-100 rounded animate-pulse" />
+                        <div className="h-8 w-8 bg-gray-100 rounded animate-pulse" />
+                    </div>
+                </div>
+
+                {/* Grid skeleton matching actual grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {Array.from({ length: 4 }).map((_, idx) => (
+                        <div key={`skel-${idx}`} className="h-48 bg-gray-50 rounded-2xl animate-pulse border border-gray-100" />
+                    ))}
+                </div>
             </div>
         );
     }

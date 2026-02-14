@@ -304,6 +304,33 @@ def get_odds(req: https_fn.Request) -> https_fn.Response:
 
 
 @https_fn.on_request(cors=cors_options)
+def get_event_markets(req: https_fn.Request) -> https_fn.Response:
+    """
+    Get all available markets for a specific event.
+    Query parameters:
+        event_id (required): Betfair event ID
+        market_types (optional): Comma-separated list of market type codes
+    """
+    try:
+        event_id = req.args.get('event_id')
+        if not event_id:
+            return make_error_response("event_id is required", status=400)
+        
+        market_types_param = req.args.get('market_types')
+        market_type_codes = market_types_param.split(',') if market_types_param else None
+        
+        from third_party.betting_platforms.betfair_exchange import BetfairExchange
+        betfair = BetfairExchange()
+        betfair.login()
+        
+        result = betfair.get_event_markets(event_id, market_type_codes)
+        return make_success_response(data=result)
+    except Exception as e:
+        logger.error(f"Get event markets error: {e}", exc_info=True)
+        return make_error_response(str(e))
+
+
+@https_fn.on_request(cors=cors_options)
 def place_bet(req: https_fn.Request) -> https_fn.Response:
     """
     Place multiple bets on Betfair Exchange.
@@ -468,16 +495,23 @@ def save_settings(req: https_fn.CallableRequest) -> Any:
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message=str(e))
 
 
-@https_fn.on_call(cors=cors_options)
+@https_fn.on_request(timeout_sec=300, cors=cors_options)
+# @https_fn.on_call(timeout_sec=60, memory=options.MemoryOption.GB_1)
 def get_upcoming_games(req: https_fn.CallableRequest) -> Any:
     """
     Get all upcoming games based on user settings.
+    Optional query parameter 'date' (YYYY-MM-DD) to filter by specific date.
     """
     manager = BettingManager()
     result = []
     
     try:
-        result = manager.get_all_upcoming_games(sport="Soccer")
+        date = req.args.get('date')
+        competitions = req.args.get('competitions', None)
+        if competitions != None:
+            competitions = competitions.split(',')
+            
+        result = manager.get_all_upcoming_games(sport="Soccer", date=date, competitions=competitions)
     except Exception as e:
         logger.error(f"Error fetching upcoming games: {e}", exc_info=True)
         return make_error_response(str(e), as_dict=True)

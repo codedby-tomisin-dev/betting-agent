@@ -1,6 +1,6 @@
 import { httpsCallable } from "firebase/functions";
 import { functions } from "./firebase";
-import { BetSelectionItem, Bet, BetEvent } from "@/shared/types";
+import { BetSelectionItem, Bet, BetEvent, MarketOption } from "@/shared/types";
 
 /**
  * Approve a bet intent and queue it for placement
@@ -41,11 +41,35 @@ export const getBetHistory = async (
  * Fetch all upcoming games from the backend
  */
 export const fetchUpcomingGames = async (date?: string) => {
+    const isDev = typeof window !== "undefined" && window.location.hostname === "localhost";
+    const projectId = "skilful-sphere-392008";
+    const region = "europe-west2";
+
+    const baseUrl = isDev
+        ? `http://127.0.0.1:5001/${projectId}/${region}`
+        : `https://${region}-${projectId}.cloudfunctions.net`;
+
+    const params = new URLSearchParams({ sport: 'soccer' });
+    if (date) {
+        params.append('date', date);
+    }
+
+    const url = `${baseUrl}/get_upcoming_games?${params.toString()}`;
+
     try {
-        const getGames = httpsCallable(functions, 'get_upcoming_games');
-        const result = await getGames({ date });
-        const response = result.data as { status: string; data: BetEvent[] };
-        return response.data || [];
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        return result.data as BetEvent[] || [];
     } catch (error) {
         console.error("Failed to fetch upcoming games:", error);
         return [];
@@ -142,6 +166,46 @@ export const placeBets = async (bets: PlaceBetOrder[]) => {
         return result;
     } catch (error) {
         console.error("Failed to place bets:", error);
+        throw error;
+    }
+};
+
+/**
+ * Fetch all available markets for a specific event
+ */
+export const fetchEventMarkets = async (providerEventId: string, marketTypes?: string[]) => {
+    const isDev = typeof window !== "undefined" && window.location.hostname === "localhost";
+    const projectId = "skilful-sphere-392008";
+    const region = "europe-west2";
+
+    const baseUrl = isDev
+        ? `http://127.0.0.1:5001/${projectId}/${region}`
+        : `https://${region}-${projectId}.cloudfunctions.net`;
+
+    const params = new URLSearchParams({ event_id: providerEventId });
+    if (marketTypes && marketTypes.length > 0) {
+        params.append('market_types', marketTypes.join(','));
+    }
+
+    const url = `${baseUrl}/get_event_markets?${params.toString()}`;
+
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || `HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        return result.data as MarketOption[];
+    } catch (error) {
+        console.error("Failed to fetch event markets:", error);
         throw error;
     }
 };

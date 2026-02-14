@@ -53,6 +53,7 @@ export interface MarketOption {
  * Full event with available markets
  */
 export interface BetEvent extends EventInfo {
+    provider_event_id?: string;
     options?: MarketOption[];
 }
 

@@ -1,4 +1,5 @@
 from collections import defaultdict
+from datetime import datetime
 from typing import List, Dict, Any, Optional
 import os
 import uuid
@@ -54,20 +55,23 @@ class BetfairExchange(BaseBettingPlatform):
             "points_balance": account_funds.points_balance
         }
 
-    def search_market(self, sport: str, competitions: List[str] = [], market_type_codes: Optional[List[str]] = None, text_query: Optional[str] = None) -> List[Dict[str, Any]]:
+    def search_market(self, sport: str, competitions: List[str] = [], market_type_codes: Optional[List[str]] = None, text_query: Optional[str] = None, date: Optional[str] = None, all_markets: Optional[bool] = False) -> List[Dict[str, Any]]:
         """
         Search for markets given a sport.
         This implementation looks for default markets if market_type_codes is None.
         Optional text_query allows filtering for specific matches (e.g. 'Man Utd').
+        Optional date filters events to a specific date (format: YYYY-MM-DD).
         """
         if market_type_codes is None:
-            market_type_codes = [
-                'MATCH_ODDS', 'DOUBLE_CHANCE', 'OVER_UNDER', 'OVER_UNDER_05', 'OVER_UNDER_15',
-                'OVER_UNDER_25', 'OVER_UNDER_35', 'OVER_UNDER_45', 'OVER_UNDER_55', 'OVER_UNDER_65',
-                'TOTAL_CARDS', 'OVER_UNDER_05_CARDS', 'OVER_UNDER_15_CARDS',
-                'OVER_UNDER_25_CARDS', 'OVER_UNDER_35_CARDS', 'OVER_UNDER_45_CARDS',
-                'BOTH_TEAMS_TO_SCORE'
-            ]
+            market_type_codes = ['MATCH_ODDS']
+            if all_markets:
+                market_type_codes += [
+                    'DOUBLE_CHANCE', 'OVER_UNDER', 'OVER_UNDER_05', 'OVER_UNDER_15',
+                    'OVER_UNDER_25', 'OVER_UNDER_35', 'OVER_UNDER_45', 'OVER_UNDER_55', 'OVER_UNDER_65',
+                    'TOTAL_CARDS', 'OVER_UNDER_05_CARDS', 'OVER_UNDER_15_CARDS',
+                    'OVER_UNDER_25_CARDS', 'OVER_UNDER_35_CARDS', 'OVER_UNDER_45_CARDS',
+                    'BOTH_TEAMS_TO_SCORE'
+                ]
 
         event_types = self.client.betting.list_event_types(
             filter=betfairlightweight.filters.market_filter(text_query=sport)
@@ -109,16 +113,22 @@ class BetfairExchange(BaseBettingPlatform):
                 logger.warning(f"No competitions found for {competitions}")
                 return []
 
-        market_catalogue = self.client.betting.list_market_catalogue(
-            filter=betfairlightweight.filters.market_filter(
-                text_query=text_query,
-                event_type_ids=[event_type_id],
-                competition_ids=competition_ids if competition_ids else None,
-                market_type_codes=market_type_codes,
-            ),
-            max_results=40,
-            market_projection=['EVENT', 'RUNNER_METADATA', 'MARKET_START_TIME', 'MARKET_DESCRIPTION', 'COMPETITION']
-        )
+        try:
+            market_catalogue = self.client.betting.list_market_catalogue(
+                filter=betfairlightweight.filters.market_filter(
+                    text_query=text_query,
+                    event_type_ids=[event_type_id],
+                    competition_ids=competition_ids if competition_ids else None,
+                    market_type_codes=market_type_codes,
+                ),
+                max_results=40,
+                market_projection=['EVENT', 'RUNNER_METADATA', 'MARKET_START_TIME', 'MARKET_DESCRIPTION', 'COMPETITION']
+            )
+            
+            logger.info(f"Retrieved {len(market_catalogue)} markets from Betfair")
+        except Exception as e:
+            logger.error(f"Error fetching market catalogue")
+            market_catalogue = None
 
         if not market_catalogue:
             return []
@@ -144,6 +154,7 @@ class BetfairExchange(BaseBettingPlatform):
 
             if event_key not in events_grouped:
                 events_grouped[event_key] = {
+                    'provider_event_id': market.event.id,
                     'name': market.event.name,
                     'time': market.market_start_time,
                     'competition': {
@@ -170,10 +181,104 @@ class BetfairExchange(BaseBettingPlatform):
             events_grouped[event_key]['options'].append({
                 "name": market.description.market_type,
                 "market_id": market.market_id,
-                "options": market_options
+                "options": market_options,
             })
+        
+        events = list(events_grouped.values())
+        
+        # Filter by date if provided
+        if date:
+            filtered_events = []
+            for event in events:
+                event_time = event.get('time')
+                if isinstance(event_time, datetime):
+                    event_date = event_time.strftime('%Y-%m-%d')
+                else:
+                    logger.error(f"Error filtering event. Invalid event time: {event_time}")
+                    continue
+                    
+                if event_date == date:
+                    filtered_events.append(event)
+            return filtered_events
             
-        return list(events_grouped.values())
+        return events
+
+    def get_event_markets(self, event_id: str, market_type_codes: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        """
+        Fetch all available markets for a specific event.
+        
+        Args:
+            event_id: Betfair event ID
+            market_type_codes: Optional list of market type codes to filter by.
+                              If None, fetches all available market types.
+        
+        Returns:
+            List of market dictionaries with odds and runner information.
+        """
+        if market_type_codes is None:
+            market_type_codes = [
+                'MATCH_ODDS', 'DOUBLE_CHANCE', 'OVER_UNDER', 'OVER_UNDER_05', 'OVER_UNDER_15',
+                'OVER_UNDER_25', 'OVER_UNDER_35', 'OVER_UNDER_45', 'OVER_UNDER_55', 'OVER_UNDER_65',
+                'TOTAL_CARDS', 'OVER_UNDER_05_CARDS', 'OVER_UNDER_15_CARDS',
+                'OVER_UNDER_25_CARDS', 'OVER_UNDER_35_CARDS', 'OVER_UNDER_45_CARDS',
+                'BOTH_TEAMS_TO_SCORE'
+            ]
+        
+        try:
+            market_catalogue = self.client.betting.list_market_catalogue(
+                filter=betfairlightweight.filters.market_filter(
+                    event_ids=[event_id],
+                    market_type_codes=market_type_codes,
+                ),
+                max_results=100,
+                market_projection=['RUNNER_METADATA', 'MARKET_START_TIME', 'MARKET_DESCRIPTION']
+            )
+            
+            if not market_catalogue:
+                return []
+            
+            market_ids = [m.market_id for m in market_catalogue]
+            
+            market_books = self.client.betting.list_market_book(
+                market_ids=market_ids,
+                price_projection=betfairlightweight.filters.price_projection(
+                    price_data=['EX_BEST_OFFERS']
+                )
+            )
+            
+            books_map = {book.market_id: book for book in market_books}
+            
+            markets = []
+            for market in market_catalogue:
+                book = books_map.get(market.market_id)
+                if not book:
+                    continue
+                
+                runner_odds = {}
+                for runner in book.runners:
+                    best_price = runner.ex.available_to_back[0].price if runner.ex.available_to_back else None
+                    runner_odds[runner.selection_id] = best_price
+                
+                market_options = []
+                for runner in market.runners:
+                    price = runner_odds.get(runner.selection_id)
+                    market_options.append({
+                        "name": runner.runner_name,
+                        "odds": price,
+                        "selection_id": runner.selection_id
+                    })
+                
+                markets.append({
+                    "name": market.description.market_type,
+                    "market_id": market.market_id,
+                    "options": market_options,
+                })
+            
+            return markets
+            
+        except Exception as e:
+            logger.error(f"Error fetching markets for event {event_id}: {e}", exc_info=True)
+            return []
 
     def place_bets(self, bets: List[Dict[str, Any]]) -> Dict[str, Any]:
         """

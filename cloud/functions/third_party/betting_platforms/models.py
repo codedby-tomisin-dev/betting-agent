@@ -21,6 +21,7 @@ class Competition(BaseModel):
 
 class Event(BaseModel):
     """Event with nested structure matching frontend EventInfo"""
+    provider_event_id: str
     name: str
     time: datetime
     competition: Competition

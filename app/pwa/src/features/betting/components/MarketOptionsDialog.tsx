@@ -29,14 +29,45 @@ export function MarketOptionsDialog({
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [analysis, setAnalysis] = useState<AIAnalysisResponse | null>(null);
     const { toggleSelection } = useBetSlip();
+    const [allMarkets, setAllMarkets] = useState<MarketOption[]>([]);
+    const [isLoadingMarkets, setIsLoadingMarkets] = useState(false);
+
+    // Fetch all markets when dialog opens if provider_event_id is available
+    useEffect(() => {
+        if (isOpen && event.provider_event_id) {
+            const fetchMarkets = async () => {
+                try {
+                    setIsLoadingMarkets(true);
+                    const { fetchEventMarkets } = await import("@/shared/api/bettingApi");
+                    const markets = await fetchEventMarkets(event.provider_event_id!);
+
+                    // Merge with existing markets, avoiding duplicates
+                    const existingMarketIds = new Set(event.options?.map(m => m.market_id) || []);
+                    const newMarkets = markets.filter(m => !existingMarketIds.has(m.market_id));
+                    setAllMarkets([...(event.options || []), ...newMarkets]);
+                } catch (error) {
+                    console.error("Failed to fetch event markets:", error);
+                    // Fall back to existing markets
+                    setAllMarkets(event.options || []);
+                } finally {
+                    setIsLoadingMarkets(false);
+                }
+            };
+            fetchMarkets();
+        } else if (isOpen) {
+            // No provider_event_id, use existing markets
+            setAllMarkets(event.options || []);
+        }
+    }, [isOpen, event.provider_event_id, event.options]);
 
     // Reset analysis when dialog opens/closes
     useEffect(() => {
         if (!isOpen) {
             setAnalysis(null);
             setIsAnalyzing(false);
+            setAllMarkets([]);
         }
-    }, [isOpen, event]); // event object reference ok if stable, or use event.name
+    }, [isOpen]);
 
     const handleAnalyze = async () => {
         try {
@@ -79,12 +110,16 @@ export function MarketOptionsDialog({
                     </div>
 
                     <div className="px-6 pb-6 space-y-6">
-                        {(!event.options || event.options.length === 0) ? (
+                        {isLoadingMarkets ? (
+                            <p className="text-sm text-gray-500 text-center py-8">
+                                Loading additional markets...
+                            </p>
+                        ) : (!allMarkets || allMarkets.length === 0) ? (
                             <p className="text-sm text-gray-500 text-center py-8">
                                 No markets available for this event
                             </p>
                         ) : (
-                            event.options.map((option, optIdx) => (
+                            allMarkets.map((option, optIdx) => (
                                 <div key={`${option.market_id || optIdx}`} className="space-y-2">
                                     <h4 className="text-sm font-semibold text-gray-700 sticky top-0 bg-gray-50/50 py-1 backdrop-blur-sm">{option.name}</h4>
                                     <div className="grid grid-cols-2 gap-2">

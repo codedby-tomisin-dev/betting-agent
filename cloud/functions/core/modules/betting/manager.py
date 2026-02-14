@@ -23,11 +23,12 @@ class BettingManager:
         self.repo = BetRepository()
         self.settings_manager = SettingsManager()
 
-    def get_all_upcoming_games(self, sport: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_all_upcoming_games(self, sport: Optional[str] = None, date: Optional[str] = None, competitions: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """
         Get all upcoming games from Betfair based on user settings.
         
         Args:
+            sport: Sport to search (defaults to "Soccer").
             date: Optional date string in YYYY-MM-DD format to filter games.
 
         Returns:
@@ -36,12 +37,12 @@ class BettingManager:
         # Use competitions from RELIABLE_TEAMS constants to ensure we show relevant leagues
         # This matches the user request to "show other options that are not AI recommended"
         # but are still in the trusted leagues.
-        competitions = list(RELIABLE_TEAMS.keys())
+        competitions = competitions or list(RELIABLE_TEAMS.keys())
         
-        logger.info(f"Fetching upcoming games for competitions: {competitions}")
+        logger.info(f"Fetching upcoming games for competitions: {competitions}" + (f" on date: {date}" if date else ""))
         
         try:
-            games = self.betfair.search_market(sport=sport, competitions=competitions)
+            games = self.betfair.search_market(sport=sport, competitions=competitions, date=date)
             
             formatted_games = []
 
@@ -214,7 +215,8 @@ class BettingManager:
         result = self.betfair.search_market(
             request.sport, 
             competitions=request.competitions, 
-            text_query=request.query
+            text_query=request.query,
+            all_markets=True
         )
         return result
     

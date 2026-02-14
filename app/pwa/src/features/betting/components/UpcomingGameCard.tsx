@@ -54,7 +54,7 @@ export function UpcomingGameCard({
     return (
         <>
             <div
-                className="w-full p-4 bg-gray-100 rounded-xl border-0 flex flex-col justify-between hover:bg-gray-200 transition-colors cursor-pointer group h-fit"
+                className="w-full p-4 bg-gray-100 rounded-xl border-0 flex flex-col justify-between hover:bg-gray-200 transition-colors cursor-pointer group h-48"
                 onClick={() => setIsMarketsOpen(true)}
             >
                 <div>

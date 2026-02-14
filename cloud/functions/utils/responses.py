@@ -45,7 +45,7 @@ def make_success_response(data: Any, status: int = 200, as_dict: bool = False) -
     """
     payload = {
         "status": "success",
-        "data": data or {}
+        "data": data if data is not None else {}
     }
 
     return _make_response(payload, status, as_dict)
