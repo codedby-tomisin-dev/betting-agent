@@ -69,8 +69,8 @@ export function UpcomingGameCard({
                     </div>
 
                     <div className="space-y-0.5">
-                        <h4 className="font-bold text-gray-900 text-sm leading-tight truncate" title={homeTeam}>{homeTeam}</h4>
-                        {awayTeam && <h4 className="font-bold text-gray-900 text-sm leading-tight truncate" title={awayTeam}>{awayTeam}</h4>}
+                        <h4 className="font-semibold text-gray-900 text-lg leading-tight truncate" title={homeTeam}>{homeTeam}</h4>
+                        {awayTeam && <h4 className="font-semibold text-gray-900 text-lg leading-tight truncate" title={awayTeam}>{awayTeam}</h4>}
                     </div>
                 </div>
             </div>
