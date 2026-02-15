@@ -72,7 +72,8 @@ export function MarketOptionsDialog({
     const handleAnalyze = async () => {
         try {
             setIsAnalyzing(true);
-            const result = await analyzeSingleGame(event);
+            // Pass all fetched markets to the AI for comprehensive analysis
+            const result = await analyzeSingleGame(event, undefined, undefined, allMarkets);
             setAnalysis(result);
         } catch (error) {
             console.error("Analysis failed:", error);

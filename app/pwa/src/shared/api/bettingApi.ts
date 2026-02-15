@@ -82,7 +82,8 @@ export const fetchUpcomingGames = async (date?: string) => {
 export const analyzeSingleGame = async (
     game: BetEvent,
     budget?: number,
-    risk_appetite?: number
+    risk_appetite?: number,
+    markets?: MarketOption[]
 ) => {
     const isDev = typeof window !== "undefined" && window.location.hostname === "localhost";
     const projectId = "skilful-sphere-392008";
@@ -94,6 +95,9 @@ export const analyzeSingleGame = async (
 
     const url = `${baseUrl}/analyze_bets`;
 
+    // If markets are provided, use them; otherwise use the game's existing options
+    const eventToAnalyze = markets ? { ...game, options: markets } : game;
+
     try {
         const response = await fetch(url, {
             method: 'POST',
@@ -101,7 +105,7 @@ export const analyzeSingleGame = async (
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                events: [game],
+                events: [eventToAnalyze],
                 budget,
                 risk_appetite
             }),

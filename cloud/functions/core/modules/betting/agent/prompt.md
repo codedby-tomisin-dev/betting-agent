@@ -382,6 +382,83 @@ The user will specify a Risk Level (1-5). You must interpret this strictly as a 
 
 ---
 
+### **Rule 3.5: The "Extreme Mismatch" Safe Win**
+* **Context:** Match odds show extreme disparity between teams in MATCH_ODDS market.
+* **Logic:** When odds gap is massive (10+ difference OR opponent >10 odds), the favorite win becomes a near-certainty.
+* **Direction:** **STRAIGHT WIN BET IS ULTRA-SAFE.**
+
+**Qualifying Criteria (BOTH conditions must be met):**
+1. **Odds Disparity:** Favorite odds vs Underdog odds difference ≥ 10 points
+   - Example: Favorite @ 1.07, Underdog @ 44.0 (difference = 42.93 ✓)
+   - Example: Favorite @ 1.32, Underdog @ 15.5 (difference = 14.18 ✓)
+2. **OR Underdog Odds:** Underdog odds > 10.0 (regardless of favorite odds)
+   - Example: Favorite @ 1.24, Underdog @ 15.5 ✓
+   - Example: Favorite @ 1.07, Underdog @ 44.0 ✓
+
+**When This Rule Applies:**
+- Top-tier team vs lower-league opposition (Cup competitions)
+- Elite team vs relegation-battling team with massive quality gap
+- Champions League winner vs domestic minnow
+- Any scenario where bookmakers price underdog at 10.0+ odds
+
+**Market Recommendations:**
+
+**Match Result Markets:**
+* *Risk 1:* `MATCH_ODDS` (Favorite Win) @ 1.05-1.35 → **Stake: 18-25 units** — Safe as Under 6.5 goals
+  * **Rationale:** When underdog is 10.0+ or gap is 10+ points, favorite win probability is 90%+
+  * **Historical Hit Rate:** ~92-95% in extreme mismatches
+  * **Stake Justification:** This is effectively a near-certainty despite being a straight win bet
+* *Risk 2:* `MATCH_ODDS` (Favorite Win) @ 1.15-1.50 → **Stake: 12-18 units** — Still extremely safe
+* *Risk 3:* `MATCH_ODDS` (Favorite Win) @ 1.20-1.80 → **Stake: 6-10 units** — Standard backing
+* *Risk 4-5:* `MATCH_ODDS` (Favorite Win by 2+ goals) @ 1.80-2.50 → **Stake: 2-4 units** — Margin backing
+
+**Goal Markets (Complementary):**
+* *Risk 1:* `OVER_UNDER_05` (Over 0.5) @ 1.03-1.10 → **Stake: 20-25 units** — Favorite will score
+* *Risk 2:* `BOTH_TEAMS_TO_SCORE` (No) @ 1.40-1.70 → **Stake: 10-14 units** — Underdog unlikely to score
+* *Risk 3:* `OVER_UNDER_25` (Over) @ 1.60-2.00 → **Stake: 5-7 units** — Favorite dominance
+
+**Critical Rules for Extreme Mismatch:**
+1. **ALWAYS check both teams' motivation** — Dead rubber for favorite = avoid
+2. **Verify starting XI** — Heavy rotation by favorite = reduce stake by 50%
+3. **Cup competition context** — Underdog "giant-killing" motivation exists but rarely succeeds at 10.0+ odds
+4. **Weather/pitch conditions** — Extreme weather can be a leveler; reduce stake by 30% if severe conditions
+5. **Recent form irrelevant** — Even if favorite lost last match, 10.0+ odds gap overrides form concerns
+
+**Example Application:**
+
+**Scenario:** Arsenal vs Wigan (FA Cup) - MATCH_ODDS: Arsenal 1.07, Wigan 44.0, Draw 21.0
+- **Odds Gap:** 42.93 (✓ Qualifies - exceeds 10)
+- **Underdog Odds:** 44.0 (✓ Qualifies - exceeds 10.0)
+- **Context:** Premier League giant vs League Two side
+- **Team News:** Arsenal full strength, Wigan no major absences
+
+**Risk 1 Recommendation:**
+- **Primary:** `MATCH_ODDS` (Arsenal Win) @ 1.07 → **Stake: 22 units**
+  - **Reasoning:** 44.0 odds on Wigan = bookmaker implies 2.3% win probability. Historical data shows teams at 40.0+ odds win <3% of matches. This is as safe as Under 6.5 goals.
+  - **Stake Calculation:** Risk 1 base (10 units) × 2.5x multiplier (odds 1.07) × 1.1x confidence = 27.5 → Capped at 25, but using 22 to leave room for complementary bets
+- **Complementary:** `OVER_UNDER_65` (Under 6.5) @ 1.04 → **Stake: 25 units** (maximum safety)
+- **Combined Logic:** Arsenal win is near-certain; Under 6.5 provides additional safety net
+
+**Risk 2 Recommendation:**
+- **Primary:** `MATCH_ODDS` (Arsenal Win) @ 1.07 → **Stake: 16 units**
+- **Complementary:** `BOTH_TEAMS_TO_SCORE` (No) @ 1.50 → **Stake: 12 units**
+- **Combined Logic:** Arsenal wins without conceding
+
+**Risk 3 Recommendation:**
+- **Primary:** `MATCH_ODDS` (Arsenal Win) @ 1.07 → **Stake: 8 units**
+- **Complementary:** `OVER_UNDER_25` (Over) @ 1.70 → **Stake: 6 units**
+
+**When NOT to Apply This Rule:**
+❌ **Favorite odds < 1.05** — Too short, stick to Under 6.5/5.5 instead
+❌ **Underdog odds 5.0-9.9** — Not extreme enough, use Rule 3 instead
+❌ **Confirmed heavy rotation** — B-team changes dynamics entirely
+❌ **Severe weather** — Leveler effect reduces certainty
+❌ **Dead rubber for favorite** — Motivation matters even in mismatches
+
+**Key Insight:** When bookmakers price an underdog at 10.0+, they're essentially saying "this is a 9%- probability event." In these extreme scenarios, backing the favorite straight win becomes as safe as traditional Risk Level 1 markets like Under 6.5 goals. The odds may look "too short" for a match winner bet, but the probability justifies maximum stake allocation.
+
+---
+
 ### **Rule 4: The Evenly-Matched Stalemate**
 * **Context:** Two mid-table teams with similar form, no significant injuries, tactical parity.
 * **Logic:** Neither team has clear edge = cautious approach.
