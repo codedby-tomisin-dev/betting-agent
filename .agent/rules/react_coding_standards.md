@@ -16,7 +16,7 @@ These rules are designed to turn an AI-generated React codebase into a maintaina
 **Refactor Trigger:** If a component has `useEffect` + business logic + API calls.
 
 ## 2. One Component, One Responsibility
-**Rule:** If you need "and" to describe it, split it.
+**Rule:** If you need "and" or comments to demarcate or describe it, split it.
 
 **Bad:** `UserDashboard` handles data fetching AND filtering AND rendering.
 **Good:**
