@@ -3,13 +3,15 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { BetEvent, MarketOption, SelectionOption, AIAnalysisResponse, BetSelectionItem } from "@/shared/types";
-import { Check } from "lucide-react";
+import { Check, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/shared/utils";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { AIContext } from "./AIContext";
+import { QuickPickSection } from "./QuickPickSection";
 import { analyzeSingleGame } from "@/shared/api/bettingApi";
 import { toast } from "sonner";
 import { useBetSlip } from "../context/BetSlipContext";
+import { groupMarketsByCategory, type MarketCategory } from "../utils/marketCategories";
 
 interface MarketOptionsDialogProps {
     event: BetEvent;
@@ -31,6 +33,9 @@ export function MarketOptionsDialog({
     const { toggleSelection } = useBetSlip();
     const [allMarkets, setAllMarkets] = useState<MarketOption[]>([]);
     const [isLoadingMarkets, setIsLoadingMarkets] = useState(false);
+    const [expandedCategories, setExpandedCategories] = useState<Set<MarketCategory>>(
+        new Set(['Match Odds', 'Goals'])
+    );
 
     // Fetch all markets when dialog opens if provider_event_id is available
     useEffect(() => {
@@ -69,6 +74,12 @@ export function MarketOptionsDialog({
         }
     }, [isOpen]);
 
+    // Group markets by category
+    const categorizedMarkets = useMemo(() =>
+        groupMarketsByCategory(allMarkets),
+        [allMarkets]
+    );
+
     const handleAnalyze = async () => {
         try {
             setIsAnalyzing(true);
@@ -87,6 +98,24 @@ export function MarketOptionsDialog({
         toggleSelection(item);
     };
 
+    const handleQuickSelection = (market: MarketOption, selection: SelectionOption) => {
+        if (onSelectSelection) {
+            onSelectSelection(event, market, selection);
+        }
+    };
+
+    const toggleCategory = (category: MarketCategory) => {
+        setExpandedCategories(prev => {
+            const next = new Set(prev);
+            if (next.has(category)) {
+                next.delete(category);
+            } else {
+                next.add(category);
+            }
+            return next;
+        });
+    };
+
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-h-[85vh] flex flex-col max-w-md p-0 gap-0 overflow-hidden bg-gray-50/50">
@@ -97,8 +126,17 @@ export function MarketOptionsDialog({
                     </p>
                 </DialogHeader>
 
-                <div className=" bg-white flex-1 overflow-y-auto">
-                    <div className="px-6 py-4 mb-2 shadow-sm">
+                <div className="bg-white flex-1 overflow-y-auto">
+                    {/* QuickPick Section */}
+                    <QuickPickSection
+                        event={event}
+                        markets={allMarkets}
+                        onSelection={handleQuickSelection}
+                        isInSlip={isInSlip}
+                    />
+
+                    {/* AI Analysis */}
+                    <div className="px-6 py-4 mb-2 shadow-sm bg-white">
                         <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">AI Analysis</h4>
                         <AIContext
                             analysis={analysis}
@@ -110,7 +148,10 @@ export function MarketOptionsDialog({
                         />
                     </div>
 
-                    <div className="px-6 pb-6 space-y-6">
+                    {/* Categorized Markets */}
+                    <div className="px-6 pb-6 space-y-4">
+                        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide">All Markets</h4>
+
                         {isLoadingMarkets ? (
                             <p className="text-sm text-gray-500 text-center py-8">
                                 Loading additional markets...
@@ -120,43 +161,71 @@ export function MarketOptionsDialog({
                                 No markets available for this event
                             </p>
                         ) : (
-                            allMarkets.map((option, optIdx) => (
-                                <div key={`${option.market_id || optIdx}`} className="space-y-2">
-                                    <h4 className="text-sm font-semibold text-gray-700 sticky top-0 bg-gray-50/50 py-1 backdrop-blur-sm">{option.name}</h4>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {option.options?.map((selection) => {
-                                            const inSlip = isInSlip?.(option.market_id || '', selection.selection_id || '');
-                                            return (
-                                                <Button
-                                                    key={`${option.market_id}-${selection.selection_id}`}
-                                                    variant="outline"
-                                                    className={cn(
-                                                        "justify-between h-auto py-3 px-3 border-gray-200 bg-white shadow-sm",
-                                                        inSlip
-                                                            ? "bg-pink-50 border-pink-300 text-pink-700 hover:bg-pink-100 hover:border-pink-400"
-                                                            : "hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600"
-                                                    )}
-                                                    size="sm"
-                                                    onClick={() => {
-                                                        if (onSelectSelection) {
-                                                            onSelectSelection(event, option, selection);
-                                                        }
-                                                    }}
-                                                >
-                                                    <span className="flex items-center gap-1.5 overflow-hidden">
-                                                        {inSlip && <Check className="h-3 w-3 text-pink-600 shrink-0" />}
-                                                        <span className="text-xs font-medium truncate" title={selection.name}>{selection.name}</span>
-                                                    </span>
-                                                    <span className={cn(
-                                                        "font-bold text-xs ml-2",
-                                                        inSlip ? "text-pink-600" : "text-blue-600"
-                                                    )}>{selection.odds}</span>
-                                                </Button>
-                                            );
-                                        })}
+                            Array.from(categorizedMarkets.entries()).map(([category, markets]) => {
+                                if (markets.length === 0) return null;
+                                const isExpanded = expandedCategories.has(category);
+
+                                return (
+                                    <div key={category} className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                                        <button
+                                            className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors"
+                                            onClick={() => toggleCategory(category)}
+                                        >
+                                            <span className="text-sm font-semibold text-gray-700">{category}</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs text-gray-500">{markets.length} market{markets.length !== 1 ? 's' : ''}</span>
+                                                {isExpanded ? (
+                                                    <ChevronUp className="h-4 w-4 text-gray-500" />
+                                                ) : (
+                                                    <ChevronDown className="h-4 w-4 text-gray-500" />
+                                                )}
+                                            </div>
+                                        </button>
+
+                                        {isExpanded && (
+                                            <div className="p-4 space-y-4">
+                                                {markets.map((option, optIdx) => (
+                                                    <div key={`${option.market_id || optIdx}`} className="space-y-2">
+                                                        <h5 className="text-xs font-semibold text-gray-600">{option.name}</h5>
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            {option.options?.map((selection) => {
+                                                                const inSlip = isInSlip?.(option.market_id || '', selection.selection_id || '');
+                                                                return (
+                                                                    <Button
+                                                                        key={`${option.market_id}-${selection.selection_id}`}
+                                                                        variant="outline"
+                                                                        className={cn(
+                                                                            "justify-between h-auto py-3 px-3 border-gray-200 bg-white shadow-sm",
+                                                                            inSlip
+                                                                                ? "bg-pink-50 border-pink-300 text-pink-700 hover:bg-pink-100 hover:border-pink-400"
+                                                                                : "hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600"
+                                                                        )}
+                                                                        size="sm"
+                                                                        onClick={() => {
+                                                                            if (onSelectSelection) {
+                                                                                onSelectSelection(event, option, selection);
+                                                                            }
+                                                                        }}
+                                                                    >
+                                                                        <span className="flex items-center gap-1.5 overflow-hidden">
+                                                                            {inSlip && <Check className="h-3 w-3 text-pink-600 shrink-0" />}
+                                                                            <span className="text-xs font-medium truncate" title={selection.name}>{selection.name}</span>
+                                                                        </span>
+                                                                        <span className={cn(
+                                                                            "font-bold text-xs ml-2",
+                                                                            inSlip ? "text-pink-600" : "text-blue-600"
+                                                                        )}>{selection.odds}</span>
+                                                                    </Button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
-                                </div>
-                            ))
+                                );
+                            })
                         )}
                     </div>
                 </div>

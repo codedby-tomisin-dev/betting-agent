@@ -350,7 +350,7 @@ class BettingManager:
         target_events = []
         
         for event in all_events:
-            event_time = event.get("event_time")
+            event_time = event.get("time")  # Fixed: Betfair client returns 'time' not 'event_time'
             if event_time:
                 # Parse event time and check if it matches target date
 
@@ -379,7 +379,7 @@ class BettingManager:
         if reliable_teams:
             filtered_events = []
             for event in target_events:
-                event_name = event.get("event_name", "")
+                event_name = event.get("name", "")  # Fixed: Betfair client returns 'name' not 'event_name'
                 # Check if any reliable team is in the event name
                 if any(team.lower() in event_name.lower() for team in reliable_teams):
                     filtered_events.append(event)

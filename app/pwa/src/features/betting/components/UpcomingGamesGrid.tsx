@@ -2,21 +2,29 @@
 
 import { useUpcomingGames } from "../hooks/useUpcomingGames";
 import { UpcomingGameCard } from "./UpcomingGameCard";
+import { PickedForYouCard } from "./PickedForYouCard";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Bet } from "@/shared/types";
 
 const ITEMS_PER_PAGE = 4;
 
-export function UpcomingGamesGrid() {
+interface UpcomingGamesGridProps {
+    pendingBet?: Bet | null;
+    onPickedClick?: () => void;
+}
+
+export function UpcomingGamesGrid({ pendingBet, onPickedClick }: UpcomingGamesGridProps) {
     const { games, isLoading } = useUpcomingGames();
     const [page, setPage] = useState(0);
 
-    // Calculate pagination
-    const totalPages = Math.ceil(games.length / ITEMS_PER_PAGE);
-    const startIndex = page * ITEMS_PER_PAGE;
-    const currentGames = games.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    // Calculate pagination - reserve first slot for picked card if it exists on page 0
+    const gamesPerPage = (page === 0 && pendingBet) ? ITEMS_PER_PAGE - 1 : ITEMS_PER_PAGE;
+    const totalPages = Math.ceil((games.length + (pendingBet ? 1 : 0)) / ITEMS_PER_PAGE);
+    const startIndex = page === 0 ? 0 : (page * ITEMS_PER_PAGE) - (pendingBet ? 1 : 0);
+    const currentGames = games.slice(startIndex, startIndex + gamesPerPage);
 
     const handlePrev = () => {
         setPage(p => Math.max(0, p - 1));
@@ -49,7 +57,7 @@ export function UpcomingGamesGrid() {
         );
     }
 
-    if (games.length === 0) {
+    if (games.length === 0 && !pendingBet) {
         return (
             <Card className="h-full border-0 shadow-none bg-gray-50/50 flex items-center justify-center">
                 <CardContent className="text-gray-400 font-medium">
@@ -88,13 +96,23 @@ export function UpcomingGamesGrid() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 auto-rows-[12rem]">
+                {/* Show PickedForYouCard as first element on page 0 if pending bet exists - spans 2 rows */}
+                {page === 0 && pendingBet && (
+                    <div className="md:row-span-2 h-full">
+                        <PickedForYouCard
+                            bet={pendingBet}
+                            onClick={onPickedClick || (() => { })}
+                        />
+                    </div>
+                )}
+
                 {currentGames.map((game, idx) => (
                     <UpcomingGameCard key={idx} game={game} />
                 ))}
 
                 {/* Fill empty spots to maintain grid structure if simplified */}
-                {currentGames.length < ITEMS_PER_PAGE && Array.from({ length: ITEMS_PER_PAGE - currentGames.length }).map((_, idx) => (
+                {(currentGames.length + (page === 0 && pendingBet ? 1 : 0)) < ITEMS_PER_PAGE && Array.from({ length: ITEMS_PER_PAGE - currentGames.length - (page === 0 && pendingBet ? 1 : 0) }).map((_, idx) => (
                     <div key={`empty-${idx}`} className="hidden md:block" />
                 ))}
             </div>
