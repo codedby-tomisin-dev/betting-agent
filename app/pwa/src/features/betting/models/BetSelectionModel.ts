@@ -63,8 +63,24 @@ export class BetSelectionModel {
         return this.event.competition.name;
     }
 
+    get selectionName(): string {
+        return this.selection.selection_name || this.selection.market;
+    }
+
+    get marketName(): string {
+        return this.selection.market_name || this.selection.market;
+    }
+
     get market(): string {
         return this.selection.market;
+    }
+
+    get marketId(): string | undefined {
+        return this.selection.market_id;
+    }
+
+    get selectionId(): string | number | undefined {
+        return this.selection.selection_id;
     }
 
     get odds(): number {

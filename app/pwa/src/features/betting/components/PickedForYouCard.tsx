@@ -34,17 +34,17 @@ export function PickedForYouCard({ bet, onClick }: PickedForYouCardProps) {
         const selectionItem: Omit<BetSelectionItem, 'id'> = {
             event: currentSelection.event!,
             market: currentSelection.market || 'Unknown Market',
-            market_name: currentSelection.market,
-            selection_name: currentSelection.market,
-            odds: currentSelection.odds || 1.0,
+            market_name: currentSelection.marketName,
+            selection_name: currentSelection.selectionName,
+            odds: currentSelection.odds || 1,
             stake: 0,
-            market_id: currentSelection.market_id,
-            selection_id: currentSelection.selection_id,
+            market_id: currentSelection.marketId,
+            selection_id: currentSelection.selectionId,
             reasoning: currentSelection.reasoning
         };
 
         addSelection(selectionItem);
-        toast.success(`Added ${currentSelection.market} to bet slip!`);
+        toast.success(`Added ${currentSelection.marketName} to bet slip!`);
 
         // Move to next or finish
         if (currentIndex < selections.length - 1) {
@@ -68,12 +68,12 @@ export function PickedForYouCard({ bet, onClick }: PickedForYouCardProps) {
             const selectionItem: Omit<BetSelectionItem, 'id'> = {
                 event: selection.event!,
                 market: selection.market || 'Unknown Market',
-                market_name: selection.market,
-                selection_name: selection.market,
-                odds: selection.odds || 1.0,
+                market_name: selection.marketName,
+                selection_name: selection.selectionName,
+                odds: selection.odds || 1,
                 stake: 0,
-                market_id: selection.market_id,
-                selection_id: selection.selection_id,
+                market_id: selection.marketId,
+                selection_id: selection.selectionId,
                 reasoning: selection.reasoning
             };
 

@@ -15,11 +15,11 @@ import { useBetSlip } from "../context/BetSlipContext";
 import { groupMarketsByCategory, type MarketCategory } from "../utils/marketCategories";
 
 interface MarketOptionsDialogProps {
-    event: BetEvent;
-    isOpen: boolean;
-    onClose: () => void;
-    onSelectSelection?: (event: BetEvent, market: MarketOption, selection: SelectionOption) => void;
-    isInSlip?: (marketId: string, selectionId: string | number) => boolean;
+    readonly event: BetEvent;
+    readonly isOpen: boolean;
+    readonly onClose: () => void;
+    readonly onSelectSelection?: (event: BetEvent, market: MarketOption, selection: SelectionOption) => void;
+    readonly isInSlip?: (marketId: string, selectionId: string | number) => boolean;
 }
 
 export function MarketOptionsDialog({

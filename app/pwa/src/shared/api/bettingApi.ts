@@ -41,7 +41,7 @@ export const getBetHistory = async (
  * Fetch all upcoming games from the backend
  */
 export const fetchUpcomingGames = async (date?: string) => {
-    const isDev = typeof window !== "undefined" && window.location.hostname === "localhost";
+    const isDev = typeof globalThis.window !== "undefined" && globalThis.window.location.hostname === "localhost";
     const projectId = "skilful-sphere-392008";
     const region = "europe-west2";
 
@@ -85,7 +85,7 @@ export const analyzeSingleGame = async (
     risk_appetite?: number,
     markets?: MarketOption[]
 ) => {
-    const isDev = typeof window !== "undefined" && window.location.hostname === "localhost";
+    const isDev = typeof globalThis.window !== "undefined" && globalThis.window.location.hostname === "localhost";
     const projectId = "skilful-sphere-392008";
     const region = "europe-west2";
 
@@ -142,7 +142,7 @@ export interface PlaceBetOrder {
 }
 
 export const placeBets = async (bets: PlaceBetOrder[]) => {
-    const isDev = typeof window !== "undefined" && window.location.hostname === "localhost";
+    const isDev = typeof globalThis.window !== "undefined" && globalThis.window.location.hostname === "localhost";
     const projectId = "skilful-sphere-392008";
     const region = "europe-west2";
 
@@ -178,7 +178,7 @@ export const placeBets = async (bets: PlaceBetOrder[]) => {
  * Fetch all available markets for a specific event
  */
 export const fetchEventMarkets = async (providerEventId: string, marketTypes?: string[]) => {
-    const isDev = typeof window !== "undefined" && window.location.hostname === "localhost";
+    const isDev = typeof globalThis.window !== "undefined" && globalThis.window.location.hostname === "localhost";
     const projectId = "skilful-sphere-392008";
     const region = "europe-west2";
 
