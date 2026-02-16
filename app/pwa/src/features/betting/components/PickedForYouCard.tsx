@@ -1,6 +1,6 @@
 "use client";
 
-import { Sparkles, Target, Zap } from "lucide-react";
+import { Sparkles, X, ThumbsUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Bet, BetSelectionItem } from "@/shared/types";
 import { BetModel } from "../models/BetModel";
@@ -25,7 +25,7 @@ export function PickedForYouCard({ bet, onClick }: PickedForYouCardProps) {
 
     const currentSelection = selections[currentIndex];
     const remainingCount = selections.length - currentIndex;
-    
+
     // Calculate confidence (mock for now - you can enhance this based on actual data)
     const confidence = Math.floor(75 + Math.random() * 20); // 75-95%
 
@@ -42,7 +42,7 @@ export function PickedForYouCard({ bet, onClick }: PickedForYouCardProps) {
             selection_id: currentSelection.selection_id,
             reasoning: currentSelection.reasoning
         };
-        
+
         addSelection(selectionItem);
         toast.success(`Added ${currentSelection.market} to bet slip!`);
 
@@ -76,7 +76,7 @@ export function PickedForYouCard({ bet, onClick }: PickedForYouCardProps) {
                 selection_id: selection.selection_id,
                 reasoning: selection.reasoning
             };
-            
+
             addSelection(selectionItem);
         });
         toast.success(`Added all ${selections.length} picks to bet slip!`);
@@ -87,13 +87,29 @@ export function PickedForYouCard({ bet, onClick }: PickedForYouCardProps) {
     const teams = currentSelection.event?.name?.split(' v ') || ['Team 1', 'Team 2'];
 
     return (
-        <div className="w-full h-full p-4 rounded-2xl bg-gradient-to-br from-pink-500 to-pink-600 text-white flex flex-col relative overflow-hidden shadow-lg">
+        <div className="w-full h-full p-4 rounded-2xl bg-gradient-to-br from-pink-500 to-pink-600 text-white flex flex-col relative overflow-visible shadow-lg">
             {/* Decorative elements */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-16 -mt-16 blur-2xl"></div>
             <div className="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-5 rounded-full -ml-12 -mb-12 blur-xl"></div>
 
+            {/* Left Button - Skip (X) */}
+            <button
+                onClick={handleSkip}
+                className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 w-14 h-14 rounded-full bg-white shadow-lg hover:shadow-xl transition-all hover:scale-110 flex items-center justify-center group z-20 border-4 border-pink-100"
+            >
+                <X className="w-7 h-7 text-gray-400 group-hover:text-red-500 transition-colors stroke-[3]" />
+            </button>
+
+            {/* Right Button - Accept (ThumbsUp) */}
+            <button
+                onClick={handleAccept}
+                className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-14 h-14 rounded-full bg-gradient-to-br from-pink-500 to-pink-600 shadow-lg hover:shadow-xl transition-all hover:scale-110 flex items-center justify-center group z-20 border-4 border-white"
+            >
+                <ThumbsUp className="w-7 h-7 text-white fill-white" />
+            </button>
+
             {/* Pick Card */}
-            <div className="flex-1 bg-white rounded-xl p-4 mb-3 relative z-10 flex flex-col">
+            <div className="flex-1 bg-white rounded-xl p-4 relative z-10 flex flex-col">
                 <div className="flex items-center justify-between mb-3">
                     <span className="text-xs text-gray-500 font-medium bg-gray-100 px-2.5 py-1 rounded-md">
                         {currentSelection.event?.competition?.name || 'Match'}
@@ -104,56 +120,45 @@ export function PickedForYouCard({ bet, onClick }: PickedForYouCardProps) {
                     </div>
                 </div>
 
-                {/* Teams */}
-                <div className="flex flex-col items-center justify-center text-center mb-3 flex-1">
-                    <p className="text-gray-900 font-bold text-lg leading-tight mb-1">
-                        {teams[0]}
-                    </p>
-                    <p className="text-gray-400 text-xs font-medium mb-1">vs</p>
-                    <p className="text-gray-900 font-bold text-lg leading-tight">
-                        {teams[1] || teams[0]}
-                    </p>
+                {/* Teams - smaller, inline */}
+                <div className="text-center mb-1">
+                    {/* <p className="text-gray-600 text-sm font-semibold">
+                        {teams[0]} <span className="text-gray-400 text-xs mx-1">vs</span> {teams[1] || teams[0]}
+                    </p> */}
                 </div>
 
-                {/* Prediction & Odds */}
-                <div className="bg-pink-50 rounded-lg p-3 flex items-center justify-between">
-                    <div>
-                        <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">AI Prediction</p>
-                        <p className="text-gray-900 font-bold text-base">{currentSelection.market}</p>
+                {/* AI Prediction - HERO ELEMENT */}
+                <div className="flex-1 flex flex-col items-center justify-center mb-8 gap-4">
+                    <div className="text-center">
+                        <p className="text-gray-600 text-sm font-semibold">
+                            {teams[0]} <span className="text-gray-400 text-xs mx-1">vs</span> {teams[1] || teams[0]}
+                        </p>
                     </div>
-                    <div className="text-right">
-                        <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Odds</p>
-                        <p className="text-pink-600 font-bold text-2xl leading-none">{currentSelection.odds?.toFixed(2)}</p>
+                    <p className="text-gray-900 font-bold text-2xl text-center leading-tight">
+                        {currentSelection.market}
+                    </p>
+                    <div className="flex justify-center items-center gap-2">
+                        <span className="text-sm text-gray-500">Odds:</span>
+                        <span className="text-pink-600 font-bold text-2xl leading-none">
+                            {currentSelection.odds?.toFixed(2)}
+                        </span>
                     </div>
                 </div>
-
-                {/* Accept Pick Button - inside card */}
-                <Button
-                    onClick={handleAccept}
-                    className="w-full bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white border-0 h-11 text-sm font-bold flex items-center justify-center gap-2 mt-3 shadow-md"
-                >
-                    <Zap className="h-4 w-4" />
-                    Accept Pick
-                </Button>
             </div>
 
-            {/* Bottom Actions */}
-            <div className="flex gap-2 relative z-10">
-                <Button
-                    onClick={handleSkip}
-                    variant="ghost"
-                    className="flex-1 bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-white/30 h-10 text-sm font-semibold rounded-xl"
-                >
-                    Skip
-                </Button>
-                {remainingCount > 1 && (
-                    <Button
-                        onClick={handleAcceptAll}
-                        className="flex-1 bg-white hover:bg-white/90 text-pink-600 border-0 h-10 text-sm font-bold rounded-xl shadow-md"
-                    >
-                        Accept All {remainingCount}
-                    </Button>
-                )}
+            {/* Progress indicator */}
+            <div className="flex items-center justify-center gap-1.5 mt-3 relative z-10">
+                {selections.map((_, idx) => (
+                    <div
+                        key={idx}
+                        className={`h-1.5 rounded-full transition-all ${idx === currentIndex
+                            ? 'w-6 bg-white'
+                            : idx < currentIndex
+                                ? 'w-1.5 bg-white/60'
+                                : 'w-1.5 bg-white/30'
+                            }`}
+                    />
+                ))}
             </div>
         </div>
     );

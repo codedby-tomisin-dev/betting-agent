@@ -2,6 +2,7 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BetEvent, MarketOption, SelectionOption, AIAnalysisResponse, BetSelectionItem } from "@/shared/types";
 import { Check, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/shared/utils";
@@ -118,40 +119,45 @@ export function MarketOptionsDialog({
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-h-[85vh] flex flex-col max-w-md p-0 gap-0 overflow-hidden bg-gray-50/50">
-                <DialogHeader className="px-6 pt-6 pb-4 bg-white border-b border-gray-100">
+            <DialogContent className="max-h-[85vh] flex flex-col max-w-md p-0 gap-0 overflow-hidden bg-white">
+                <DialogHeader className="px-6 pt-6 pb-2 border-b border-gray-50">
                     <DialogTitle>{event.name}</DialogTitle>
                     <p className="text-xs text-gray-500">
                         {event.competition?.name} • {event.time ? new Date(event.time).toLocaleString() : 'TBD'}
                     </p>
                 </DialogHeader>
 
-                <div className="bg-white flex-1 overflow-y-auto">
-                    {/* QuickPick Section */}
-                    <QuickPickSection
-                        event={event}
-                        markets={allMarkets}
-                        onSelection={handleQuickSelection}
-                        isInSlip={isInSlip}
-                    />
-
-                    {/* AI Analysis */}
-                    <div className="px-6 py-4 mb-2 shadow-sm bg-white">
-                        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">AI Analysis</h4>
-                        <AIContext
-                            analysis={analysis}
-                            isLoading={isAnalyzing}
-                            onAnalyze={handleAnalyze}
-                            onAddSelection={handleToggleFromAI}
-                            isInSlip={isInSlip}
-                            className="mt-0"
-                        />
+                <Tabs defaultValue="quick-pick" className="flex-1 flex flex-col overflow-hidden">
+                    <div className="px-6 py-2 border-b border-gray-100">
+                        <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="quick-pick">Quick Pick</TabsTrigger>
+                            <TabsTrigger value="all-markets">All Markets</TabsTrigger>
+                        </TabsList>
                     </div>
 
-                    {/* Categorized Markets */}
-                    <div className="px-6 pb-6 space-y-4">
-                        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide">All Markets</h4>
+                    <TabsContent value="quick-pick" className="flex-1 overflow-y-auto m-0">
+                        <QuickPickSection
+                            event={event}
+                            markets={allMarkets}
+                            onSelection={handleQuickSelection}
+                            isInSlip={isInSlip}
+                        />
 
+                        {/* AI Analysis - kept inside Quick Pick for context */}
+                        <div className="px-6 py-4 mt-2 border-t border-gray-100">
+                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">AI Analysis</h4>
+                            <AIContext
+                                analysis={analysis}
+                                isLoading={isAnalyzing}
+                                onAnalyze={handleAnalyze}
+                                onAddSelection={handleToggleFromAI}
+                                isInSlip={isInSlip}
+                                className="mt-0"
+                            />
+                        </div>
+                    </TabsContent>
+
+                    <TabsContent value="all-markets" className="flex-1 overflow-y-auto m-0 p-6 space-y-4">
                         {isLoadingMarkets ? (
                             <p className="text-sm text-gray-500 text-center py-8">
                                 Loading additional markets...
@@ -227,8 +233,8 @@ export function MarketOptionsDialog({
                                 );
                             })
                         )}
-                    </div>
-                </div>
+                    </TabsContent>
+                </Tabs>
             </DialogContent>
         </Dialog>
     );
