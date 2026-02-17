@@ -7,8 +7,10 @@ from firebase_admin import initialize_app, firestore
 from firebase_functions.options import set_global_options, CorsOptions, MemoryOption
 from pydantic import ValidationError
 
+import json
 from core import logger
 from core.firestore import get_document
+from core.migrations.migrate_bet_slips import run_migration, migrate_single_document
 from core.modules.betting.manager import BettingManager
 from core.modules.betting.models import AnalyzeBetsRequest, GetOddsRequest, PlaceBetRequest
 from typing import Any
@@ -73,6 +75,25 @@ def automated_daily_betting(event: scheduler_fn.ScheduledEvent) -> None:
         
     except Exception as e:
         logger.error(f"Error in automated daily betting scheduler: {e}", exc_info=True)
+
+
+@scheduler_fn.on_schedule(
+    schedule='0 12 * * *',
+    memory=MemoryOption.GB_1,
+    timeout_sec=300,
+)
+def automated_suggestion_promotion(event: scheduler_fn.ScheduledEvent) -> None:
+    """
+    Automated scheduler to promote suggestions to bet slips.
+    Runs daily at 12:00 London time.
+    """
+    try:
+        logger.info("Automated suggestion promotion scheduler triggered")
+        manager = BettingManager()
+        result = manager.promote_suggestions_to_bets()
+        logger.info(f"Suggestion promotion result: {result}")
+    except Exception as e:
+        logger.error(f"Error in automated suggestion promotion: {e}", exc_info=True)
 
 
 @https_fn.on_request(
@@ -560,8 +581,6 @@ def migrate_bet_slips(req: https_fn.Request) -> https_fn.Response:
         doc_id: If provided, migrate only this single document
     """
     try:
-        from core.migrations.migrate_bet_slips import run_migration, migrate_single_document
-        import json
         
         # Parse params from query string or JSON body
         if req.method == "POST" and req.is_json:
@@ -586,7 +605,6 @@ def migrate_bet_slips(req: https_fn.Request) -> https_fn.Response:
         )
     except Exception as e:
         logger.error(f"Error running migration: {e}", exc_info=True)
-        import json
         return https_fn.Response(
             json.dumps({"error": str(e)}),
             status=500,

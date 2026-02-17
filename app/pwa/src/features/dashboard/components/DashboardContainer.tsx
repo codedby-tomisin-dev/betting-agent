@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useBets, useWallet } from "@/shared/hooks";
 import { useDashboardStats } from "../hooks/useDashboardStats";
-import { placeBets } from "@/shared/api/bettingApi";
+import { placeBets, fetchSuggestions } from "@/shared/api/bettingApi";
 import { BalanceCard } from "./BalanceCard";
 import { RiskProfileCard } from "./RiskProfileCard";
 import { RecentBetsListView, UpcomingGamesGrid, BetSlipFab, BetSlipDialog } from "@/features/betting";
@@ -12,7 +12,7 @@ import { BentoGrid, BentoCell } from "@/components/ui/bento-grid";
 import { Toaster } from "@/components/ui/sonner";
 import { PendingBetDialog } from "@/features/betting/components/PendingBetDialog";
 import { useBetApproval } from "@/features/betting/hooks/useBetApproval";
-import { BetSelectionItem } from "@/shared/types";
+import { BetSelectionItem, BetModel } from "@/shared/types";
 
 export function DashboardContainer() {
     const { bets, loading, error } = useBets();
@@ -23,8 +23,26 @@ export function DashboardContainer() {
     const [selectedBetId, setSelectedBetId] = useState<string | null>(null);
     const { approvingBetId, submitBetForPlacement } = useBetApproval();
 
-    const pendingBets = useMemo(() => bets.filter(b => b.status === "analyzed"), [bets]);
-    const mainPendingBet = pendingBets.length > 0 ? pendingBets[0] : null;
+    // Add state for suggestions
+    const [suggestions, setSuggestions] = useState<BetModel[]>([]);
+
+    useEffect(() => {
+        const loadSuggestions = async () => {
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                const results = await fetchSuggestions(today);
+                setSuggestions(results);
+            } catch (e) {
+                console.error("Failed to load suggestions", e);
+            }
+        };
+        loadSuggestions();
+    }, []);
+
+    const pendingBets = useMemo(() => bets.filter(b => b.status === "analyzed" || b.status === "intent"), [bets]);
+
+    // Prioritize suggestions if available, otherwise fallback to existing pending bets
+    const mainPendingBet = suggestions.length > 0 ? suggestions[0] : (pendingBets.length > 0 ? pendingBets[0] : null);
 
     const activeExposure = useMemo(() => {
         return bets

@@ -1,6 +1,7 @@
 import { httpsCallable } from "firebase/functions";
-import { functions } from "./firebase";
-import { BetSelectionItem, Bet, BetEvent, MarketOption } from "@/shared/types";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { functions, db } from "./firebase";
+import { BetSelectionItem, Bet, BetEvent, MarketOption, BetModel } from "@/shared/types";
 
 /**
  * Approve a bet intent and queue it for placement
@@ -210,6 +211,33 @@ export const fetchEventMarkets = async (providerEventId: string, marketTypes?: s
         return result.data as MarketOption[];
     } catch (error) {
         console.error("Failed to fetch event markets:", error);
+        throw error;
+    }
+};
+
+/**
+ * Fetch betting suggestions for a specific date
+ */
+export const fetchSuggestions = async (date: string): Promise<BetModel[]> => {
+    try {
+        const suggestionsRef = collection(db, "suggestions");
+        const q = query(suggestionsRef, where("target_date", "==", date));
+        const querySnapshot = await getDocs(q);
+
+        return querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                // Ensure dates are converted from Timestamp if needed, or used as is
+                created_at: data.created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+                approved_at: data.approved_at?.toDate?.()?.toISOString(),
+                placed_at: data.placed_at?.toDate?.()?.toISOString(),
+                target_date: data.target_date
+            } as BetModel;
+        });
+    } catch (error) {
+        console.error("Error fetching suggestions:", error);
         throw error;
     }
 };

@@ -9,6 +9,7 @@ from core.firestore import admin_firestore
 from core.modules.betting.agent import betting_agent
 from core.modules.betting.models import AnalyzeBetsRequest, BettingAgentResponse, GetOddsRequest, PlaceBetRequest
 from core.modules.betting.repository import BetRepository
+from core.modules.betting.suggestion_repository import SuggestionRepository
 from constants import AUTOMATED_BETTING_OPTIONS, RELIABLE_TEAMS
 from third_party.betting_platforms.models import Event
 from third_party.betting_platforms.betfair_exchange import BetfairExchange
@@ -78,69 +79,68 @@ class BettingManager:
             logger.error(f"Failed to parse events: {e}")
             raise ValueError(f"Invalid event data: {str(e)}")
         
-        # Calculate budget per event
-        num_events = len(events)
-        if num_events == 0:
-            return {"recommendations": [], "total_stake": 0, "total_returns": 0, "overall_reasoning": "No events provided."}
-            
-        budget_per_event = request.budget / num_events
-        
-        all_recommendations = []
-        overall_reasoning_parts = []
-        
-        # Analyze each event individually
+        requests_prompt = []
         for event in events:
             # Format single event string
-            event_str = f"\n{event.event_name} ({event.competition_name}) - {event.event_time}"
+            event_details = f"Event: {event.event_name} ({event.competition_name}) - {event.event_time}\n"
             for option in event.options:
-                event_str += f"\n  {option.name}:"
+                event_details += f"  Market: {option.name} (ID: {option.market_id})\n"
                 for selection in option.options:
-                    event_str += f"\n    - {selection.name}: {selection.odds} (ID: {selection.selection_id}, Market: {option.market_id})"
+                    event_details += f"    - Selection: {selection.name}, Odds: {selection.odds}, ID: {selection.selection_id}\n"
+            requests_prompt.append(event_details)
+        
+        all_events_str = "\n".join(requests_prompt)
+
+        # Build prompt for ALL events
+        prompt = f"""Analyze these betting opportunities and provide exactly 3 best betting recommendations based on the risk appetite and budget provided.
+
+        Risk Appetite: {request.risk_appetite}/5.0 (1=very safe, 5=very aggressive)
+        Budget: ${request.budget:.2f} (This is the TOTAL budget for all 3 bets combined)
+
+        Events:
+        {all_events_str}
+
+        CRITICAL REQUIREMENTS:
+        1. Select exactly 3 bets that offer the best value across ALL events provided.
+        2. The total stake of all 3 bets MUST NOT exceed ${request.budget:.2f}.
+        3. Allocate the budget wisely among the 3 bets based on confidence and value.
+        4. **IMPORTANT**: You MUST use the EXACT event names, market names, and selection names as provided above. 
+           Do NOT modify them in any way (e.g., do not change "v" to "vs", do not add/remove spaces, do not change capitalization).
+           The names must match EXACTLY as they appear in the data above.
+
+        Use web search to research recent team form, head-to-head records, any relevant recent news. Provide a list of recommended bets that offer good value while strictly respecting the budget constraint."""
+
+        logger.info(f"Analyzing {len(events)} events with total budget ${request.budget:.2f}")
+        
+        all_recommendations = []
+        overall_reasoning = ""
+
+        try:
+            result = betting_agent.run_sync(prompt)
+            response_data: BettingAgentResponse = result.output
             
-            # Build prompt for single event
-            prompt = f"""Analyze this betting opportunity and provide betting recommendations based on the risk appetite and budget provided.
+            overall_reasoning = response_data.overall_reasoning
+            
+            for rec in response_data.recommendations:
+                # Validate stake and profit
+                potential_profit = rec.stake * (rec.odds - 1)
 
-            Risk Appetite: {request.risk_appetite}/5.0 (1=very safe, 5=very aggressive)
-            Budget: ${budget_per_event:.2f} (This is a portion of the total budget allocated to this event)
-
-            Event:{event_str}
-
-            CRITICAL REQUIREMENTS:
-            1. The total stake of all your recommendations for this event MUST NOT exceed ${budget_per_event:.2f}.
-            2. If you recommend multiple bets, ensure their combined stake stays within this budget.
-            3. The total stake of all your recommendations across all events MUST NOT exceed ${request.budget}.
-            4. **IMPORTANT**: You MUST use the EXACT event names, market names, and selection names as provided above. 
-               Do NOT modify them in any way (e.g., do not change "v" to "vs", do not add/remove spaces, do not change capitalization).
-               The names must match EXACTLY as they appear in the data above.
-
-            Use web search to research recent team form, head-to-head records, any relevant recent news. Provide a list of recommended bets that offer good value while strictly respecting the budget constraint."""
-
-            logger.info(f"Analyzing event: {event.event_name} with budget ${budget_per_event:.2f}")
-            try:
-                result = betting_agent.run_sync(prompt)
-                response_data: BettingAgentResponse = result.output
+                min_stake = AUTOMATED_BETTING_OPTIONS.get("MIN_STAKE", 1.0)
+                min_profit = AUTOMATED_BETTING_OPTIONS.get("MIN_PROFIT", 0.01)
                 
-                for rec in response_data.recommendations:
-                    potential_profit = rec.stake * (rec.odds - 1)
+                if rec.stake >= min_stake and potential_profit >= min_profit:
+                    all_recommendations.append(rec)
+                else:
+                    logger.warning(
+                        f"Skipping recommendation - stake: {rec.stake} (min: {min_stake}), "
+                        f"profit: {potential_profit:.3f} (min: {min_profit}) - {rec.pick.event_name}"
+                    )
+            
+        except Exception as e:
+            logger.error(f"Error analyzing events: {e}")
+            overall_reasoning = f"Failed to analyze events - {str(e)}"
 
-                    min_stake = AUTOMATED_BETTING_OPTIONS.get("MIN_STAKE", 1.0)
-                    min_profit = AUTOMATED_BETTING_OPTIONS.get("MIN_PROFIT", 0.01)
-                    
-                    if rec.stake >= min_stake and potential_profit >= min_profit:
-                        all_recommendations.append(rec)
-                    else:
-                        logger.warning(
-                            f"Skipping recommendation - stake: {rec.stake} (min: {min_stake}), "
-                            f"profit: {potential_profit:.3f} (min: {min_profit}) - {rec.pick.event_name}"
-                        )
-                
-                overall_reasoning_parts.append(f"**{event.event_name}**: {response_data.overall_reasoning}")
-                
-            except Exception as e:
-                logger.error(f"Error analyzing event {event.event_name}: {e}")
-                overall_reasoning_parts.append(f"**{event.event_name}**: Failed to analyze - {str(e)}")
-
-        # Aggregate results
+        # Aggregate results (recommendations are already filtered)
         total_stake = sum(rec.stake for rec in all_recommendations)
         
         # Enforce budget constraint: if total stake exceeds budget, scale down proportionally
@@ -156,7 +156,9 @@ class BettingManager:
         
         total_returns = sum(rec.stake * rec.odds for rec in all_recommendations)
         
-        # Calculate total odds as sum of individual odds
+        # Calculate total odds as sum of individual odds (for accumulator logic, might differ for singles)
+        # Assuming these are single bets, total odds isn't meaningful for a combined wager unless it's an acca.
+        # But for display, sum is fine or average.
         total_odds = sum(rec.odds for rec in all_recommendations)
         
         # Transform to selections format with simplified items and full details
@@ -164,15 +166,25 @@ class BettingManager:
         
         for rec in all_recommendations:
             # Find the original event object that matches this recommendation
+            # Match by event name (careful with exact match requirement)
             original_event = next((e for e in events if e.event_name == rec.pick.event_name), None)
             
-            event_data = {
-                "name": rec.pick.event_name,
-                "time": original_event.event_time if original_event else None,
-                "competition": {
-                    "name": original_event.competition_name if original_event else "Unknown"
+            if not original_event:
+                 # Fallback: try relaxed matching in case AI slightly altered name
+                 logger.warning(f"Could not find exact event match for '{rec.pick.event_name}'. Creating simplified event data.")
+                 event_data = {
+                     "name": rec.pick.event_name,
+                     "time": None,
+                     "competition": {"name": "Unknown"}
+                 }
+            else:
+                event_data = {
+                    "name": rec.pick.event_name,
+                    "time": original_event.event_time,
+                    "competition": {
+                        "name": original_event.competition_name
+                    }
                 }
-            }
 
             selections_items.append({
                 "event": event_data,
@@ -196,7 +208,7 @@ class BettingManager:
                     "potential_returns": total_returns
                 }
             },
-            "overall_reasoning": "\n\n".join(overall_reasoning_parts)
+            "overall_reasoning": overall_reasoning
         }
     
     def get_odds(self, request: GetOddsRequest) -> Dict[str, Any]:
@@ -419,11 +431,56 @@ class BettingManager:
                 "events": [event for event in events_to_analyze]
             }
             
-            return self.repo.create_bet_intent(intent_data)
+            # Use SuggestionRepository to create an initial suggestion
+            # This replaces direcr bet intent creation
+            suggestion_repo = SuggestionRepository()
+            
+            return suggestion_repo.create_suggestion(intent_data)
             
         except Exception as e:
             logger.error(f"Failed to create bet intent: {e}")
             raise e
+
+    def promote_suggestions_to_bets(self) -> Dict[str, Any]:
+        """
+        Promotes suggestions to bet slips.
+        Runs daily.
+        """
+        logger.info("Promoting suggestions to bet slips...")
+        suggestion_repo = SuggestionRepository()
+        
+        # Get today's date
+        target_date_str = datetime.now(timezone.utc).date().isoformat()
+        
+        suggestions = suggestion_repo.get_suggestions_by_date(target_date_str)
+        
+        promoted_count = 0
+        
+        for suggestion in suggestions:
+            try:
+                # Check if bet intent already exists for this date (idempotency)
+                existing_bets = self.repo.get_matches_by_date(target_date_str)
+                if existing_bets:
+                    logger.info(f"Bet intent already exists for {target_date_str}, deleting suggestion.")
+                    suggestion_repo.delete_suggestion(suggestion['id'])
+                    continue
+
+                # Create real bet intent from suggestion data
+                # We reuse the create_bet_intent logic but bypassing the manager's check since we did it above
+                bet_doc = self.repo.create_bet_intent(suggestion)
+                logger.info(f"Promoted suggestion {suggestion.get('id')} to bet {bet_doc.get('id')}")
+                promoted_count += 1
+                
+                # Delete the suggestion after successful promotion
+                suggestion_repo.delete_suggestion(suggestion['id'])
+                
+            except Exception as e:
+                logger.error(f"Error promoting suggestion {suggestion.get('id')}: {e}")
+                
+        return {
+            "status": "success",
+            "promoted_count": promoted_count
+        }
 
     def get_bet(self, bet_id: str) -> Optional[Dict[str, Any]]:
         """
