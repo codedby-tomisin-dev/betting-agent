@@ -465,9 +465,29 @@ class BettingManager:
                     suggestion_repo.delete_suggestion(suggestion['id'])
                     continue
 
-                # Create real bet intent from suggestion data
-                # We reuse the create_bet_intent logic but bypassing the manager's check since we did it above
-                bet_doc = self.repo.create_bet_intent(suggestion)
+                # Prepare bet data from suggestion
+                # If suggestion is already analyzed, preserve that state
+                suggestion_status = suggestion.get("status")
+                
+                # Base intent data (same as before)
+                bet_data = suggestion.copy()
+                if "id" in bet_data:
+                    del bet_data["id"] # Remove ID so constant doesn't overwrite it
+                
+                # If suggestion was already analyzed by AI, we should promote it as 'analyzed'
+                # so the analyze_bet_intent trigger doesn't run again.
+                if suggestion_status == "analyzed" and "selections" in suggestion:
+                     logger.info(f"Promoting ANALYZED suggestion {suggestion.get('id')}")
+                     # Ensure fields are preserved
+                     # bet_data already has 'selections', 'ai_reasoning', 'balance' from copy()
+                     pass 
+                else:
+                    # If not analyzed, it will be promoted as 'intent' (or whatever status it has)
+                    # and the analyze_bet_intent trigger will pick it up.
+                     logger.info(f"Promoting unanalyzed suggestion {suggestion.get('id')} (status: {suggestion_status})")
+
+                # Create real bet intent
+                bet_doc = self.repo.create_bet_intent(bet_data)
                 logger.info(f"Promoted suggestion {suggestion.get('id')} to bet {bet_doc.get('id')}")
                 promoted_count += 1
                 
@@ -481,6 +501,47 @@ class BettingManager:
             "status": "success",
             "promoted_count": promoted_count
         }
+
+    def update_suggestion_analysis(self, suggestion_id: str, analysis_result: Dict[str, Any]) -> None:
+        """
+        Updates a suggestion document with analysis results.
+        Similar to update_analysis_result but for suggestions.
+        """
+        suggestion_repo = SuggestionRepository()
+        suggestion = suggestion_repo.get_suggestion(suggestion_id)
+        
+        if not suggestion:
+            logger.error(f"Suggestion {suggestion_id} not found for update")
+            return
+
+        starting_balance = suggestion.get("balance", {}).get("starting", 0)
+        
+        total_stake = analysis_result.get("total_stake", 0)
+        total_returns = analysis_result.get("total_returns", 0)
+        net_profit = total_returns - total_stake
+        
+        combined_odds = total_returns / total_stake if total_stake > 0 else 1.0
+        
+        update_data = {
+            "status": "analyzed", 
+            "analyzed_at": admin_firestore.SERVER_TIMESTAMP,
+            "selections": {
+                **analysis_result.get("selections", {}),
+                "wager": {
+                    "odds": round(combined_odds, 2),
+                    "stake": total_stake,
+                    "potential_returns": total_returns
+                }
+            },
+            "balance": {
+                **suggestion.get("balance", {}),
+                "predicted": starting_balance + net_profit
+            },
+            "ai_reasoning": analysis_result.get("overall_reasoning", ""),
+        }
+        
+        suggestion_repo.update_suggestion(suggestion_id, update_data)
+        logger.info(f"Updated suggestion {suggestion_id} with analysis results")
 
     def get_bet(self, bet_id: str) -> Optional[Dict[str, Any]]:
         """

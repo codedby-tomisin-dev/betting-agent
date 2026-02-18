@@ -61,8 +61,7 @@ class SuggestionRepository:
     def get_suggestion(self, suggestion_id: str) -> Optional[Dict[str, Any]]:
         """Get a single suggestion by ID"""
         try:
-            doc_ref = get_document(self.collection_name, suggestion_id)
-            doc = doc_ref.get()
+            doc = get_document(self.collection_name, suggestion_id)
             
             if doc.exists:
                 data = doc.to_dict()
@@ -76,9 +75,19 @@ class SuggestionRepository:
     def delete_suggestion(self, suggestion_id: str) -> bool:
         """Delete a suggestion"""
         try:
-            doc_ref = get_document(self.collection_name, suggestion_id)
+            doc_ref = get_collection(self.collection_name).document(suggestion_id)
             doc_ref.delete()
             return True
         except Exception as e:
             logger.error(f"Error deleting suggestion {suggestion_id}: {e}")
+            raise e
+
+    def update_suggestion(self, suggestion_id: str, data: Dict[str, Any]) -> bool:
+        """Update a suggestion document"""
+        try:
+            doc_ref = get_collection(self.collection_name).document(suggestion_id)
+            doc_ref.update(data)
+            return True
+        except Exception as e:
+            logger.error(f"Error updating suggestion {suggestion_id}: {e}")
             raise e

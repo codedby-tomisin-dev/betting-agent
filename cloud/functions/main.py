@@ -220,6 +220,51 @@ def analyze_bet_intent(event: firestore_fn.Event[firestore_fn.DocumentSnapshot])
             pass
 
 
+@firestore_fn.on_document_created(document="suggestions/{suggestionId}", timeout_sec=540, memory=options.MemoryOption.GB_1)
+def analyze_suggestion(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) -> None:
+    """
+    Triggered when a new suggestion is created in Firestore.
+    Performs AI analysis on the events and updates the suggestion with selections.
+    """
+    try:
+        snapshot = event.data
+        if not snapshot:
+            return
+
+        data = snapshot.to_dict()
+        suggestion_id = event.params["suggestionId"]
+        
+        # Only analyze if status is 'intent' (initial state)
+        if data.get("status") != "intent":
+             logger.info(f"Skipping suggestion analysis for {suggestion_id}: status is {data.get('status')}")
+             return
+
+        logger.info(f"Starting analysis for suggestion {suggestion_id}")
+        
+        preferences = data.get("preferences", {})
+        budget = preferences.get("budget", 10.0)
+        risk_appetite = preferences.get("risk_appetite", 3.0)
+        
+        # Create AnalyzeBetsRequest object
+        analysis_request = AnalyzeBetsRequest(
+            events=data.get("events", []),
+            risk_appetite=risk_appetite,
+            budget=budget
+        )
+        
+        manager = BettingManager()
+        recommendations = manager.analyze_betting_opportunities(analysis_request)
+        manager.update_suggestion_analysis(suggestion_id, recommendations)
+
+        logger.info(f"Analysis completed for suggestion {suggestion_id}")
+        
+    except Exception as e:
+        logger.error(f"Error analyzing suggestion {event.params['suggestionId']}: {e}", exc_info=True)
+        # We don't mark suggestions as failed in the same way, or maybe we should?
+        # For now just log errors.
+
+
+
 @firestore_fn.on_document_updated(document="bet_slips/{betId}", timeout_sec=60, memory=options.MemoryOption.GB_1)
 def place_bet_on_ready(event: firestore_fn.Event[firestore_fn.Change[firestore_fn.DocumentSnapshot]]) -> None:
     """
