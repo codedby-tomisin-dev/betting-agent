@@ -49,3 +49,12 @@ class BaseRepository:
         Deletes a document.
         """
         self.collection.document(doc_id).delete()
+
+    def _query_to_list(self, query) -> list:
+        """Stream a Firestore query and return results as dicts, each with 'id' injected."""
+        results = []
+        for doc in query.stream():
+            data = doc.to_dict()
+            data["id"] = doc.id
+            results.append(data)
+        return results

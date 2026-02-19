@@ -75,3 +75,7 @@ RELIABLE_TEAMS = {
     ]
 }
 
+# Derived from RELIABLE_TEAMS — computed once at import time
+RELIABLE_COMPETITIONS = list(RELIABLE_TEAMS.keys())
+RELIABLE_ALL_TEAMS = [team for teams in RELIABLE_TEAMS.values() for team in teams]
+

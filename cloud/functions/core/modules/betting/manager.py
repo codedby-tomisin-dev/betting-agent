@@ -1,4 +1,4 @@
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone, date, timedelta
 from random import shuffle
 from typing import Dict, Any, List, Optional
 
@@ -10,19 +10,56 @@ from core.modules.betting.agent import betting_agent
 from core.modules.betting.models import AnalyzeBetsRequest, BettingAgentResponse, GetOddsRequest, PlaceBetRequest
 from core.modules.betting.repository import BetRepository
 from core.modules.betting.suggestion_repository import SuggestionRepository
-from constants import AUTOMATED_BETTING_OPTIONS, RELIABLE_TEAMS
+from constants import AUTOMATED_BETTING_OPTIONS, RELIABLE_COMPETITIONS
 from third_party.betting_platforms.models import Event
-from third_party.betting_platforms.betfair_exchange import BetfairExchange
+from core.modules.betting.betfair_service import BetfairService
 from core.modules.settings.manager import SettingsManager
 
 class BettingManager:
     """Manager for betting analysis and recommendations"""
 
-    def __init__(self):
-        self.betfair = BetfairExchange()
-        self.betfair.login()
-        self.repo = BetRepository()
-        self.settings_manager = SettingsManager()
+    def __init__(self, betfair_service=None, bet_repo=None, settings_manager=None):
+        self.betfair = betfair_service or BetfairService()
+        self.repo = bet_repo or BetRepository()
+        self.settings_manager = settings_manager or SettingsManager()
+
+    @staticmethod
+    def _build_analysis_update(existing_doc: dict, analysis_result: dict) -> dict:
+        """Build the common Firestore update payload after AI analysis for both bet slips and suggestions."""
+        starting_balance = existing_doc.get("balance", {}).get("starting", 0)
+        total_stake = analysis_result.get("total_stake", 0)
+        total_returns = analysis_result.get("total_returns", 0)
+        net_profit = total_returns - total_stake
+        combined_odds = total_returns / total_stake if total_stake > 0 else 1.0
+        return {
+            "status": "analyzed",
+            "analyzed_at": admin_firestore.SERVER_TIMESTAMP,
+            "selections": {
+                **analysis_result.get("selections", {}),
+                "wager": {
+                    "odds": round(combined_odds, 2),
+                    "stake": total_stake,
+                    "potential_returns": total_returns
+                }
+            },
+            "balance": {
+                **existing_doc.get("balance", {}),
+                "predicted": starting_balance + net_profit
+            },
+            "ai_reasoning": analysis_result.get("overall_reasoning", ""),
+        }
+
+    @staticmethod
+    def _calculate_budget(available_balance: float, bankroll_percent: float, max_bankroll: float) -> float:
+        """Calculate betting budget as a capped percentage of available balance."""
+        return min(available_balance * (bankroll_percent / 100), max_bankroll)
+
+    @staticmethod
+    def _is_valid_bet(stake: float, odds: float) -> bool:
+        """Return True if a bet meets the minimum stake and profit requirements."""
+        min_stake = AUTOMATED_BETTING_OPTIONS.get("MIN_STAKE", 0)
+        min_profit = AUTOMATED_BETTING_OPTIONS.get("MIN_PROFIT", 0)
+        return stake >= min_stake and stake * (odds - 1) >= min_profit
 
     def get_all_upcoming_games(self, sport: Optional[str] = None, date: Optional[str] = None, competitions: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """
@@ -38,7 +75,7 @@ class BettingManager:
         # Use competitions from RELIABLE_TEAMS constants to ensure we show relevant leagues
         # This matches the user request to "show other options that are not AI recommended"
         # but are still in the trusted leagues.
-        competitions = competitions or list(RELIABLE_TEAMS.keys())
+        competitions = competitions or RELIABLE_COMPETITIONS
         
         logger.info(f"Fetching upcoming games for competitions: {competitions}" + (f" on date: {date}" if date else ""))
         
@@ -122,18 +159,13 @@ class BettingManager:
             overall_reasoning = response_data.overall_reasoning
             
             for rec in response_data.recommendations:
-                # Validate stake and profit
-                potential_profit = rec.stake * (rec.odds - 1)
-
-                min_stake = AUTOMATED_BETTING_OPTIONS.get("MIN_STAKE", 1.0)
-                min_profit = AUTOMATED_BETTING_OPTIONS.get("MIN_PROFIT", 0.01)
-                
-                if rec.stake >= min_stake and potential_profit >= min_profit:
+                if self._is_valid_bet(rec.stake, rec.odds):
                     all_recommendations.append(rec)
                 else:
+                    potential_profit = rec.stake * (rec.odds - 1)
                     logger.warning(
-                        f"Skipping recommendation - stake: {rec.stake} (min: {min_stake}), "
-                        f"profit: {potential_profit:.3f} (min: {min_profit}) - {rec.pick.event_name}"
+                        f"Skipping recommendation - stake: {rec.stake}, "
+                        f"profit: {potential_profit:.3f} - {rec.pick.event_name}"
                     )
             
         except Exception as e:
@@ -324,12 +356,7 @@ class BettingManager:
                 "available_balance": available_balance
             }
         
-        # Calculate betting budget
-        budget = min(
-            available_balance * (bankroll_percent / 100),
-            max_bankroll
-        )
-        
+        budget = self._calculate_budget(available_balance, bankroll_percent, max_bankroll)
         logger.info(f"Available balance: {available_balance}, Betting budget: {budget}")
         
         # Search for odds across competitions
@@ -441,6 +468,148 @@ class BettingManager:
             logger.error(f"Failed to create bet intent: {e}")
             raise e
 
+    def execute_hourly_automated_betting(
+        self,
+        bankroll_percent: float = 5.0,
+        max_bankroll: float = 100.0,
+        risk_appetite: float = 3.0
+    ) -> Dict[str, Any]:
+        """
+        Executes hourly automated betting logic:
+        1. Checks if any active automated bets exist (to prevent stacking risk).
+        2. Sources "Next Games" (next 1h) from ALL leagues.
+        3. Analyzes and auto-bets.
+        """
+        logger.info("Starting hourly automated betting execution")
+
+        # 1. Sequential Check: Ensure no active automated bets
+        try:
+            # We check for any bets that are 'placed' or 'started' but not finished
+            active_placed_bets = self.repo.get_placed_bets(limit=1)
+            if active_placed_bets:
+                logger.info("Active placed bets found. Skipping hourly execution to prevent stacking risk.")
+                return {
+                    "status": "skipped",
+                    "reason": "Active bets in progress"
+                }
+        except Exception as e:
+            logger.error(f"Error checking active bets: {e}")
+            # Fail safe or continue? Better to fail safe.
+            return {"status": "error", "reason": f"Failed to check active bets: {e}"}
+
+        # 2. Source Games (Next 1 Hour)
+        try:
+            now = datetime.now(timezone.utc)
+            one_hour_later = now + timedelta(hours=1)
+            
+            from_time = now.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+            to_time = one_hour_later.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+            
+            logger.info(f"Sourcing games between {from_time} and {to_time}")
+            
+            # Search "Soccer" - no competition filter = all leagues
+            # max_results=40 (API limit/default)
+            events = self.betfair.search_market(
+                sport="Soccer",
+                from_time=from_time,
+                to_time=to_time,
+                max_results=40,
+                all_markets=True # Get side markets like Over/Under for better options
+            )
+            
+            if not events:
+                logger.info("No games found starting in the next hour.")
+                return {
+                    "status": "skipped",
+                    "reason": "No games found next hour"
+                }
+
+            logger.info(f"Found {len(events)} games in the next hour.")
+            
+            # Optional: Filter or Shuffle?
+            # Shuffle to avoid bias to just the first few returned if we have many
+            if len(events) > 10:
+                shuffle(events)
+                events = events[:10] # Analyze max 10 to save tokens/time
+                
+        except Exception as e:
+            logger.error(f"Error sourcing hourly games: {e}")
+            return {"status": "error", "reason": f"Sourcing failed: {e}"}
+
+        # 3. Calculate Budget
+        balance_info = self.get_balance()
+        available_balance = balance_info.get("available_balance", 0)
+        
+        if available_balance <= 0:
+            logger.warning("No available balance for hourly betting")
+            return {"status": "skipped", "reason": "No funds"}
+
+        budget = self._calculate_budget(available_balance, bankroll_percent, max_bankroll)
+        logger.info(f"Hourly Budget: ${budget:.2f}")
+
+        # 4. AI Analysis
+        try:
+            analysis_request = AnalyzeBetsRequest(
+                events=events,
+                risk_appetite=risk_appetite,
+                budget=budget
+            )
+            
+            recommendations = self.analyze_betting_opportunities(analysis_request)
+            
+            # Check if we have valid items
+            items = recommendations.get("selections", {}).get("items", [])
+            if not items:
+                logger.info("AI returned no valid betting recommendations.")
+                return {"status": "skipped", "reason": "No AI recommendations"}
+
+        except Exception as e:
+            logger.error(f"Error during AI analysis: {e}")
+            return {"status": "error", "reason": f"AI analysis failed: {e}"}
+
+        # 5. Auto-Stake (Create 'ready' bet)
+        try:
+            # Construct Bet Intent Data directly
+            bet_data = {
+                "target_date": now.date().isoformat(),
+                "status": "ready", # Auto-ready for placement
+                "created_at": admin_firestore.SERVER_TIMESTAMP,
+                "approved_at": admin_firestore.SERVER_TIMESTAMP, # Auto-approved
+                "source": "hourly_automated",
+                "preferences": {
+                    "risk_appetite": risk_appetite,
+                    "budget": budget,
+                    "period": "hourly",
+                    "from_time": from_time
+                },
+                "balance": {
+                    "starting": available_balance,
+                    "predicted": recommendations["balance"]["predicted"] if "balance" in recommendations else None,
+                },
+                "selections": recommendations["selections"],
+                "ai_reasoning": recommendations.get("overall_reasoning", ""),
+                "events": [
+                    {
+                        "name": getattr(e, "name", e.get("name")), 
+                        "time": getattr(e, "time", e.get("time")),
+                        "competition": getattr(e, "competition", e.get("competition"))
+                    } for e in events
+                ] # Store context of what was analyzed
+            }
+            
+            bet_doc = self.repo.create_bet_intent(bet_data)
+            logger.info(f"Created hourly automated bet {bet_doc.get('id')} with status 'ready'")
+            
+            return {
+                "status": "success",
+                "bet_id": bet_doc.get("id"),
+                "wager": recommendations.get("selections", {}).get("wager")
+            }
+            
+        except Exception as e:
+            logger.error(f"Error creating hourly bet: {e}")
+            raise e
+
     def promote_suggestions_to_bets(self) -> Dict[str, Any]:
         """
         Promotes suggestions to bet slips.
@@ -477,14 +646,14 @@ class BettingManager:
                 # If suggestion was already analyzed by AI, we should promote it as 'analyzed'
                 # so the analyze_bet_intent trigger doesn't run again.
                 if suggestion_status == "analyzed" and "selections" in suggestion:
-                     logger.info(f"Promoting ANALYZED suggestion {suggestion.get('id')}")
-                     # Ensure fields are preserved
-                     # bet_data already has 'selections', 'ai_reasoning', 'balance' from copy()
-                     pass 
+                    logger.info(f"Promoting ANALYZED suggestion {suggestion.get('id')}")
+                    # Ensure fields are preserved
+                    # bet_data already has 'selections', 'ai_reasoning', 'balance' from copy()
+                    pass 
                 else:
                     # If not analyzed, it will be promoted as 'intent' (or whatever status it has)
                     # and the analyze_bet_intent trigger will pick it up.
-                     logger.info(f"Promoting unanalyzed suggestion {suggestion.get('id')} (status: {suggestion_status})")
+                    logger.info(f"Promoting unanalyzed suggestion {suggestion.get('id')} (status: {suggestion_status})")
 
                 # Create real bet intent
                 bet_doc = self.repo.create_bet_intent(bet_data)
@@ -503,43 +672,13 @@ class BettingManager:
         }
 
     def update_suggestion_analysis(self, suggestion_id: str, analysis_result: Dict[str, Any]) -> None:
-        """
-        Updates a suggestion document with analysis results.
-        Similar to update_analysis_result but for suggestions.
-        """
+        """Updates a suggestion document with analysis results."""
         suggestion_repo = SuggestionRepository()
         suggestion = suggestion_repo.get_suggestion(suggestion_id)
-        
         if not suggestion:
             logger.error(f"Suggestion {suggestion_id} not found for update")
             return
-
-        starting_balance = suggestion.get("balance", {}).get("starting", 0)
-        
-        total_stake = analysis_result.get("total_stake", 0)
-        total_returns = analysis_result.get("total_returns", 0)
-        net_profit = total_returns - total_stake
-        
-        combined_odds = total_returns / total_stake if total_stake > 0 else 1.0
-        
-        update_data = {
-            "status": "analyzed", 
-            "analyzed_at": admin_firestore.SERVER_TIMESTAMP,
-            "selections": {
-                **analysis_result.get("selections", {}),
-                "wager": {
-                    "odds": round(combined_odds, 2),
-                    "stake": total_stake,
-                    "potential_returns": total_returns
-                }
-            },
-            "balance": {
-                **suggestion.get("balance", {}),
-                "predicted": starting_balance + net_profit
-            },
-            "ai_reasoning": analysis_result.get("overall_reasoning", ""),
-        }
-        
+        update_data = self._build_analysis_update(suggestion, analysis_result)
         suggestion_repo.update_suggestion(suggestion_id, update_data)
         logger.info(f"Updated suggestion {suggestion_id} with analysis results")
 
@@ -556,37 +695,9 @@ class BettingManager:
         return self.repo.get_bet(bet_id)
     
     def update_analysis_result(self, bet_id: str, analysis_result: Dict[str, Any]) -> None:
-        """
-        Updates a bet document with analysis results.
-        """
-        # Get current bet to access starting balance
+        """Updates a bet document with analysis results."""
         bet_data = self.repo.get_bet(bet_id)
-        starting_balance = bet_data.get("balance", {}).get("starting", 0)
-        
-        total_stake = analysis_result.get("total_stake", 0)
-        total_returns = analysis_result.get("total_returns", 0)
-        net_profit = total_returns - total_stake
-        
-        # Calculate combined odds
-        combined_odds = total_returns / total_stake if total_stake > 0 else 1.0
-        
-        update_data = {
-            "status": "analyzed", # Pauses here for manual approval
-            "analyzed_at": admin_firestore.SERVER_TIMESTAMP,
-            "selections": {
-                **analysis_result.get("selections", {}),
-                "wager": {
-                    "odds": round(combined_odds, 2),
-                    "stake": total_stake,
-                    "potential_returns": total_returns
-                }
-            },
-            "balance": {
-                **bet_data.get("balance", {}),
-                "predicted": starting_balance + net_profit
-            },
-            "ai_reasoning": analysis_result.get("overall_reasoning", ""),
-        }
+        update_data = self._build_analysis_update(bet_data, analysis_result)
         self.repo.update_bet(bet_id, update_data)
         logger.info(f"Updated bet {bet_id} with analysis results")
 
@@ -634,9 +745,7 @@ class BettingManager:
         logger.info(f"Approved bet intent {bet_id}")
 
     def update_placement_result(self, bet_id: str, placement_result: Dict[str, Any]) -> None:
-        """
-        Updates a bet document with placement results.
-        """
+        """Updates a bet document with placement results."""
         update_data = {
             "status": "placed",
             "placed_at": admin_firestore.SERVER_TIMESTAMP,
@@ -644,6 +753,44 @@ class BettingManager:
         }
         self.repo.update_bet(bet_id, update_data)
         logger.info(f"Updated bet {bet_id} with placement results")
+
+    def prepare_and_place_bets_from_ready_doc(self, bet_id: str, after_data: dict) -> None:
+        """
+        Validates selections from a 'ready' bet document, filters invalid bets,
+        places them on Betfair, and updates the document with results.
+        """
+        selections_data = after_data.get("selections", [])
+        selections = selections_data.get("items", []) if isinstance(selections_data, dict) else selections_data
+
+        if not selections:
+            logger.warning(f"No selections found for ready bet {bet_id}")
+            return
+
+        bets_to_place = []
+        for item in selections:
+            stake = item.get("stake")
+            odds = item.get("odds")
+            if stake and odds:
+                if self._is_valid_bet(stake, odds):
+                    bets_to_place.append({
+                        "market_id": item.get("market_id"),
+                        "selection_id": item.get("selection_id"),
+                        "stake": stake,
+                        "odds": odds,
+                        "side": item.get("side", "BACK")
+                    })
+                else:
+                    potential_profit = stake * (odds - 1)
+                    logger.warning(
+                        f"Skipping bet - stake: {stake}, profit: {potential_profit:.3f}"
+                    )
+
+        if not bets_to_place:
+            logger.warning(f"No valid bets to place for {bet_id}")
+            return
+
+        result = self.place_bet(request=PlaceBetRequest(bets=bets_to_place))
+        self.update_placement_result(bet_id, result)
 
     def create_and_place_bet(self, request: PlaceBetRequest) -> Dict[str, Any]:
         """

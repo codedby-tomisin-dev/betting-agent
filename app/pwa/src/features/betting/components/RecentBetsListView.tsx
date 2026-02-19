@@ -90,18 +90,6 @@ export function RecentBetsListView({ bets }: RecentBetsListViewProps) {
                         ))
                     )}
                 </CardContent>
-                <CardFooter className="flex items-center justify-center border-t pt-6 mt-2">
-                    <div className="flex items-center gap-6 text-sm font-medium text-gray-600">
-                        <span className="flex items-center gap-2">
-                            <span className="h-2.5 w-2.5 rounded-full bg-[#8a2be2]" />
-                            {wins} Won
-                        </span>
-                        <span className="flex items-center gap-2">
-                            <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
-                            {losses} Lost
-                        </span>
-                    </div>
-                </CardFooter>
             </Card>
 
             <ActiveBetDetailsDialog

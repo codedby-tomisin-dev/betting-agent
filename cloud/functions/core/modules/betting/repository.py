@@ -93,15 +93,7 @@ class BetRepository(BaseRepository):
         """
         try:
             query = self.collection.where("target_date", "==", target_date)
-            docs = query.stream()
-            
-            results = []
-            for doc in docs:
-                data = doc.to_dict()
-                data["id"] = doc.id
-                results.append(data)
-                
-            return results
+            return self._query_to_list(query)
             
         except Exception as e:
             logger.error(f"Error retrieving bets for date {target_date}: {e}")
@@ -119,15 +111,7 @@ class BetRepository(BaseRepository):
             # Note: status remains 'placed' until ALL bets in intent are settled (then 'finished').
             # So looking for 'placed' is correct for ongoing/partial updates.
             query = self.collection.where("status", "==", "placed").limit(limit)
-            docs = query.stream()
-            
-            results = []
-            for doc in docs:
-                data = doc.to_dict()
-                data["id"] = doc.id
-                results.append(data)
-                
-            return results
+            return self._query_to_list(query)
         except Exception as e:
             logger.error(f"Error retrieving placed bets: {e}")
             raise e

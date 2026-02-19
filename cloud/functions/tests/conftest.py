@@ -51,14 +51,24 @@ def mock_betting_repo():
 
 @pytest.fixture
 def betting_manager(mock_betfair_client, mock_betting_repo):
-    """Create a BettingManager with mocked dependencies."""
+    """Create a BettingManager with mocked dependencies injected via constructor."""
     from core.modules.betting.manager import BettingManager
-    
-    manager = BettingManager()
-    manager.betfair = mock_betfair_client
-    manager.repo = mock_betting_repo
-    
-    return manager
+    from unittest.mock import MagicMock
+
+    mock_service = MagicMock()
+    mock_service.get_balance.return_value = {
+        "available_balance": mock_betfair_client.account.get_account_funds.return_value.available_to_bet_balance,
+        "exposure": 0.0,
+        "retained_commission": 0.0,
+        "exposure_limit": -1000.0,
+        "discount_rate": 0.0,
+        "points_balance": 0,
+    }
+    mock_service.place_bets.return_value = {"status": "SUCCESS", "bets": []}
+    mock_service.search_market.return_value = []
+    mock_service.list_cleared_orders.return_value = []
+
+    return BettingManager(betfair_service=mock_service, bet_repo=mock_betting_repo)
 
 
 @pytest.fixture

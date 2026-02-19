@@ -1,1 +1,0 @@
-TOP_TEAMS = ['Arsenal', 'Man City', 'Aston Villa', 'Barcelona', 'Real Madrid']

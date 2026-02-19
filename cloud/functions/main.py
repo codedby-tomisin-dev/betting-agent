@@ -9,7 +9,6 @@ from pydantic import ValidationError
 
 import json
 from core import logger
-from core.firestore import get_document
 from core.migrations.migrate_bet_slips import run_migration, migrate_single_document
 from core.modules.betting.manager import BettingManager
 from core.modules.betting.models import AnalyzeBetsRequest, GetOddsRequest, PlaceBetRequest
@@ -17,7 +16,7 @@ from typing import Any
 from core.modules.betting.repository import BetRepository
 from core.modules.settings.manager import SettingsManager
 from utils.responses import make_error_response, make_success_response
-from constants import AUTOMATED_BETTING_OPTIONS, RELIABLE_TEAMS
+from constants import RELIABLE_TEAMS, RELIABLE_COMPETITIONS, RELIABLE_ALL_TEAMS
 from core.modules.notifications import NotificationManager
 
 
@@ -49,32 +48,40 @@ def automated_daily_betting(event: scheduler_fn.ScheduledEvent) -> None:
     """
     try:
         logger.info("Automated daily betting scheduler triggered")
-        
-        manager = BettingManager()
-        
-        competitions = list(RELIABLE_TEAMS.keys())
-        all_teams = [team for teams in RELIABLE_TEAMS.values() for team in teams]
-
-        settings_doc = get_document("settings", "betting")
-        settings = settings_doc.to_dict() if settings_doc.exists else {}
-
-        bankroll_percent = settings.get("BANKROLL_PERCENT", AUTOMATED_BETTING_OPTIONS["BANKROLL_PERCENT"])
-        max_bankroll = settings.get("MAX_BANKROLL", AUTOMATED_BETTING_OPTIONS["MAX_BANKROLL"])
-        risk_appetite = settings.get("RISK_APPETITE", AUTOMATED_BETTING_OPTIONS["RISK_APPETITE"])
-        use_reliable_teams = settings.get("USE_RELIABLE_TEAMS", AUTOMATED_BETTING_OPTIONS["USE_RELIABLE_TEAMS"])
-        
-        result = manager.execute_automated_betting(
-            competitions=competitions,
-            bankroll_percent=bankroll_percent,
-            max_bankroll=max_bankroll,
-            reliable_teams=all_teams if use_reliable_teams else None,
-            risk_appetite=risk_appetite,
+        settings = SettingsManager().get_betting_settings()
+        result = BettingManager().execute_automated_betting(
+            competitions=RELIABLE_COMPETITIONS,
+            bankroll_percent=settings.bankroll_percent,
+            max_bankroll=settings.max_bankroll,
+            reliable_teams=RELIABLE_ALL_TEAMS if settings.use_reliable_teams else None,
+            risk_appetite=settings.risk_appetite,
         )
-        
         logger.info(f"Automated betting intent created: {result}")
-        
     except Exception as e:
         logger.error(f"Error in automated daily betting scheduler: {e}", exc_info=True)
+
+
+@scheduler_fn.on_schedule(
+    schedule='0 * * * *',
+    memory=MemoryOption.GB_1,
+    timeout_sec=300
+)
+def hourly_automated_betting(event: scheduler_fn.ScheduledEvent) -> None:
+    """
+    Automated betting scheduler that runs hourly.
+    Sources games starting in the next hour from ALL leagues, analyzes them, and places bets.
+    """
+    try:
+        logger.info("Hourly automated betting scheduler triggered")
+        settings = SettingsManager().get_betting_settings()
+        result = BettingManager().execute_hourly_automated_betting(
+            bankroll_percent=settings.bankroll_percent,
+            max_bankroll=settings.max_bankroll,
+            risk_appetite=settings.risk_appetite,
+        )
+        logger.info(f"Hourly automated betting result: {result}")
+    except Exception as e:
+        logger.error(f"Error in hourly automated betting scheduler: {e}", exc_info=True)
 
 
 @scheduler_fn.on_schedule(
@@ -109,36 +116,17 @@ def automated_daily_betting_http(req: https_fn.Request) -> https_fn.Response:
     """
     try:
         logger.info("Automated daily betting HTTP endpoint triggered")
-        
-        manager = BettingManager()
-        
-        # Derive competitions and teams from RELIABLE_TEAMS
-        competitions = list(RELIABLE_TEAMS.keys())
-        all_teams = [team for teams in RELIABLE_TEAMS.values() for team in teams]
-
         target_date = req.args.get('date', None)
-        
-        # Fetch settings from Firestore or use defaults
-        settings_doc = get_document("settings", "betting")
-        settings = settings_doc.to_dict() if settings_doc.exists else {}
-
-        bankroll_percent = settings.get("BANKROLL_PERCENT", AUTOMATED_BETTING_OPTIONS["BANKROLL_PERCENT"])
-        max_bankroll = settings.get("MAX_BANKROLL", AUTOMATED_BETTING_OPTIONS["MAX_BANKROLL"])
-        risk_appetite = settings.get("RISK_APPETITE", AUTOMATED_BETTING_OPTIONS["RISK_APPETITE"])
-        use_reliable_teams = settings.get("USE_RELIABLE_TEAMS", AUTOMATED_BETTING_OPTIONS["USE_RELIABLE_TEAMS"])
-        
-        result = manager.execute_automated_betting(
-            competitions=competitions,
-            bankroll_percent=bankroll_percent,
-            max_bankroll=max_bankroll,
-            reliable_teams=all_teams if use_reliable_teams else None,
-            risk_appetite=risk_appetite,
+        settings = SettingsManager().get_betting_settings()
+        result = BettingManager().execute_automated_betting(
+            competitions=RELIABLE_COMPETITIONS,
+            bankroll_percent=settings.bankroll_percent,
+            max_bankroll=settings.max_bankroll,
+            reliable_teams=RELIABLE_ALL_TEAMS if settings.use_reliable_teams else None,
+            risk_appetite=settings.risk_appetite,
             target_date=target_date,
         )
-
         return make_success_response(result)
-
-        
     except Exception as e:
         logger.error(f"Error in automated daily betting HTTP endpoint: {e}", exc_info=True)
         return make_error_response(str(e))
@@ -267,11 +255,7 @@ def analyze_suggestion(event: firestore_fn.Event[firestore_fn.DocumentSnapshot])
 
 @firestore_fn.on_document_updated(document="bet_slips/{betId}", timeout_sec=60, memory=options.MemoryOption.GB_1)
 def place_bet_on_ready(event: firestore_fn.Event[firestore_fn.Change[firestore_fn.DocumentSnapshot]]) -> None:
-    """
-    Triggered when a bet document status changes to 'ready'.
-    Places the bets on Betfair.
-    """
-    
+    """Triggered when a bet document status changes to 'ready'. Places the bets on Betfair."""
     try:
         before = event.data.before.to_dict()
         after = event.data.after.to_dict()
@@ -279,66 +263,16 @@ def place_bet_on_ready(event: firestore_fn.Event[firestore_fn.Change[firestore_f
 
         if before.get("status") == "ready" or after.get("status") != "ready":
             return
-            
+
         logger.info(f"Placing bets for ready intent {bet_id}")
-        
-        # Use selections_full which has all the required betting details
-        selections_data = after.get("selections", [])
-        
-        # Handle both list and dictionary (new) formats for selections
-        if isinstance(selections_data, dict):
-            selections = selections_data.get("items", [])
-        else:
-            selections = selections_data
-        
-        if not selections:
-            logger.warning(f"No selections found for ready bet {bet_id}")
-            return
-
-        bets_to_place = []
-        for item in selections:
-            stake = item.get("stake")
-            odds = item.get("odds")
-            
-            if stake and odds:
-                # Calculate potential profit
-                potential_profit = stake * (odds - 1)
-                
-                min_stake = AUTOMATED_BETTING_OPTIONS.get("MIN_STAKE", 1.0)
-                min_profit = AUTOMATED_BETTING_OPTIONS.get("MIN_PROFIT", 0.01)
-                
-                # Validate minimum requirements
-                if stake >= min_stake and potential_profit >= min_profit:
-                    bets_to_place.append({
-                        "market_id": item.get("market_id"),
-                        "selection_id": item.get("selection_id"),
-                        "stake": stake,
-                        "odds": odds,
-                        "side": item.get("side", "BACK")
-                    })
-                else:
-                    logger.warning(
-                        f"Skipping bet - stake: {stake} (min: {min_stake}), "
-                        f"profit: {potential_profit:.3f} (min: {min_profit})"
-                    )
-            
-        if not bets_to_place:
-             logger.warning(f"No valid bets to place for {bet_id}")
-             return
-
         manager = BettingManager()
-        place_bet_request = PlaceBetRequest(bets=bets_to_place)
-        result = manager.place_bet(request=place_bet_request)
-        
-        manager.update_placement_result(bet_id, result)
-        
+        manager.prepare_and_place_bets_from_ready_doc(bet_id, after)
         logger.info(f"Bets placed for {bet_id}")
-        
+
     except Exception as e:
         logger.error(f"Error placing bets for {event.params['betId']}: {e}", exc_info=True)
         try:
-            manager = BettingManager()
-            manager.mark_bet_failed(event.params['betId'], f"Placement failed: {str(e)}")
+            BettingManager().mark_bet_failed(event.params['betId'], f"Placement failed: {str(e)}")
         except:
             pass
 
