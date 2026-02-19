@@ -252,7 +252,6 @@ def analyze_suggestion(event: firestore_fn.Event[firestore_fn.DocumentSnapshot])
         # For now just log errors.
 
 
-
 @firestore_fn.on_document_updated(document="bet_slips/{betId}", timeout_sec=60, memory=options.MemoryOption.GB_1)
 def place_bet_on_ready(event: firestore_fn.Event[firestore_fn.Change[firestore_fn.DocumentSnapshot]]) -> None:
     """Triggered when a bet document status changes to 'ready'. Places the bets on Betfair."""

@@ -6,7 +6,7 @@ import sys
 from unittest.mock import MagicMock, Mock
 import pytest
 
-# Mock Firebase dependencies before any imports
+# Mock Firebase and OpenAI dependencies before any imports
 sys.modules['firebase_admin'] = MagicMock()
 sys.modules['firebase_admin.firestore'] = MagicMock()
 sys.modules['firebase_functions'] = MagicMock()
@@ -14,6 +14,11 @@ sys.modules['firebase_functions.https_fn'] = MagicMock()
 sys.modules['firebase_functions.scheduler_fn'] = MagicMock()
 sys.modules['firebase_functions.firestore_fn'] = MagicMock()
 sys.modules['firebase_functions.options'] = MagicMock()
+# Prevent OpenAI client from being instantiated at module import time
+sys.modules['openai'] = MagicMock()
+sys.modules['pydantic_ai'] = MagicMock()
+sys.modules['pydantic_ai.models'] = MagicMock()
+sys.modules['pydantic_ai.models.openai'] = MagicMock()
 
 
 @pytest.fixture
@@ -94,11 +99,12 @@ def sample_bets():
 
 @pytest.fixture
 def sample_event():
-    """Sample event data for testing."""
+    """Sample event data for testing (uses new schema: name, time, competition)."""
     return {
-        "event_name": "Manchester United vs Liverpool",
-        "event_time": "2025-01-01T15:00:00Z",
-        "competition_name": "English Premier League",
+        "provider_event_id": "123456",
+        "name": "Manchester United vs Liverpool",
+        "time": "2025-01-01T15:00:00Z",
+        "competition": {"name": "English Premier League"},
         "options": [
             {
                 "name": "Match Odds",

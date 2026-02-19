@@ -160,4 +160,4 @@ def test_search_market():
             results = client.search_market("Soccer", ["Test League"])
             
             assert len(results) > 0
-            assert results[0]["event_name"] == "Test Match"
+            assert results[0]["name"] == "Test Match"
