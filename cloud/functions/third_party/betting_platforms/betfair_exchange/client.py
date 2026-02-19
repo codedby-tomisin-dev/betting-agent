@@ -34,19 +34,44 @@ class BetfairExchange(BaseBettingPlatform):
         self.client.login()
 
     def _build_runner_options(self, market, book) -> list:
-        """Build a list of runner option dicts from a market catalogue entry and its book."""
+        """Build a list of runner option dicts from a market catalogue entry (dict) and its book (object)."""
         runner_odds = {
             r.selection_id: (r.ex.available_to_back[0].price if r.ex.available_to_back else None)
             for r in book.runners
         }
-        return [
-            {"name": r.runner_name, "odds": runner_odds.get(r.selection_id), "selection_id": r.selection_id}
-            for r in market.runners
-        ]
+        
+        # Determine if market is dict (lightweight) or object
+        runners = market.get('runners', []) if isinstance(market, dict) else market.runners
+        
+        options = []
+        for r in runners:
+            # Handle both dict and object for runner
+            if isinstance(r, dict):
+                r_name = r.get('runnerName')
+                r_id = r.get('selectionId')
+            else:
+                r_name = r.runner_name
+                r_id = r.selection_id
+                
+            options.append({
+                "name": r_name, 
+                "odds": runner_odds.get(r_id), 
+                "selection_id": r_id
+            })
+            
+        return options
 
     def _fetch_markets_with_odds(self, market_catalogue: list) -> dict:
-        """Fetch market books for a list of catalogue entries and return a market_id → book mapping."""
-        market_ids = [m.market_id for m in market_catalogue]
+        """Fetch market books for a list of catalogue entries (dicts or objects) and return a market_id → book mapping."""
+        # Handle both dicts (lightweight) and objects
+        market_ids = [
+            (m.get('marketId') if isinstance(m, dict) else m.market_id) 
+            for m in market_catalogue
+        ]
+        
+        if not market_ids:
+            return {}
+
         market_books = self.client.betting.list_market_book(
             market_ids=market_ids,
             price_projection=betfairlightweight.filters.price_projection(
@@ -134,7 +159,7 @@ class BetfairExchange(BaseBettingPlatform):
         if from_time or to_time:
             market_start_time = betfairlightweight.filters.time_range(
                 from_=from_time,
-                to_=to_time
+                to=to_time
             )
 
         try:
@@ -148,7 +173,8 @@ class BetfairExchange(BaseBettingPlatform):
                 ),
                 max_results=max_results,
                 market_projection=['EVENT', 'RUNNER_METADATA', 'MARKET_START_TIME', 'MARKET_DESCRIPTION', 'COMPETITION'],
-                sort='FIRST_TO_START' # Prioritize imminent games
+                sort='FIRST_TO_START', # Prioritize imminent games
+                lightweight=True
             )
             
             logger.info(f"Retrieved {len(market_catalogue)} markets from Betfair")
@@ -163,19 +189,25 @@ class BetfairExchange(BaseBettingPlatform):
 
         events_grouped = {}
         for market in market_catalogue:
-            book = books_map.get(market.market_id)
+            market_id = market.get('marketId')
+            book = books_map.get(market_id)
             if not book:
                 continue
 
-            event_key = (market.event.name, market.market_start_time, market.competition.name if market.competition else None)
+            event_name = market.get('event', {}).get('name')
+            market_start_time = market.get('marketStartTime')
+            competition = market.get('competition')
+            competition_name = competition.get('name') if competition else None
+
+            event_key = (event_name, market_start_time, competition_name)
 
             if event_key not in events_grouped:
                 events_grouped[event_key] = {
-                    'provider_event_id': market.event.id,
-                    'name': market.event.name,
-                    'time': market.market_start_time,
+                    'provider_event_id': market.get('event', {}).get('id'),
+                    'name': event_name,
+                    'time': market_start_time,
                     'competition': {
-                        'name': market.competition.name if market.competition else None
+                        'name': competition_name
                     },
                     'options': []
                 }
@@ -183,8 +215,8 @@ class BetfairExchange(BaseBettingPlatform):
             market_options = self._build_runner_options(market, book)
 
             events_grouped[event_key]['options'].append({
-                "name": market.description.market_type,
-                "market_id": market.market_id,
+                "name": market.get('description', {}).get('marketType'),
+                "market_id": market_id,
                 "options": market_options,
             })
         
@@ -195,14 +227,18 @@ class BetfairExchange(BaseBettingPlatform):
             filtered_events = []
             for event in events:
                 event_time = event.get('time')
-                if isinstance(event_time, datetime):
-                    event_date = event_time.strftime('%Y-%m-%d')
+                # event_time from output is string in lightweight mode (ISO format)
+                # Need to handle string parsing if necessary
+                if isinstance(event_time, str):
+                    # Simple prefix check might be robust enough for YYYY-MM-DD
+                    if event_time.startswith(date):
+                        filtered_events.append(event)
+                elif isinstance(event_time, datetime):
+                     if event_time.strftime('%Y-%m-%d') == date:
+                        filtered_events.append(event)
                 else:
                     logger.error(f"Error filtering event. Invalid event time: {event_time}")
                     continue
-                    
-                if event_date == date:
-                    filtered_events.append(event)
             return filtered_events
             
         return events
@@ -229,7 +265,8 @@ class BetfairExchange(BaseBettingPlatform):
                     market_type_codes=market_type_codes,
                 ),
                 max_results=100,
-                market_projection=['RUNNER_METADATA', 'MARKET_START_TIME', 'MARKET_DESCRIPTION']
+                market_projection=['RUNNER_METADATA', 'MARKET_START_TIME', 'MARKET_DESCRIPTION'],
+                lightweight=True
             )
             
             if not market_catalogue:
@@ -239,15 +276,16 @@ class BetfairExchange(BaseBettingPlatform):
 
             markets = []
             for market in market_catalogue:
-                book = books_map.get(market.market_id)
+                market_id = market.get('marketId')
+                book = books_map.get(market_id)
                 if not book:
                     continue
 
                 market_options = self._build_runner_options(market, book)
 
                 markets.append({
-                    "name": market.description.market_type,
-                    "market_id": market.market_id,
+                    "name": market.get('description', {}).get('marketType'),
+                    "market_id": market_id,
                     "options": market_options,
                 })
             
@@ -371,7 +409,7 @@ class BetfairExchange(BaseBettingPlatform):
         if settled_date_range:
             time_range = betfairlightweight.filters.time_range(
                 from_=settled_date_range[0].strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-                to_=settled_date_range[1].strftime("%Y-%m-%dT%H:%M:%S.000Z")
+                to=settled_date_range[1].strftime("%Y-%m-%dT%H:%M:%S.000Z")
             )
             filter_kwargs["settled_date_range"] = time_range
 

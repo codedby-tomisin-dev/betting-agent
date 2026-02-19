@@ -51,7 +51,7 @@ export function ActiveBetDetailsDialog({ bet, isOpen, onClose }: ActiveBetDetail
                     <div className="flex items-center justify-between">
                         <DialogTitle>Bet Details</DialogTitle>
                         <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-                            Placed
+                            Active
                         </Badge>
                     </div>
                 </DialogHeader>

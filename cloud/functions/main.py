@@ -32,7 +32,6 @@ initialize_app()
 cors_options = CorsOptions(
     cors_origins=["*"],
     cors_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    # cors_allow_headers=["Content-Type", "Authorization"]
 )
 
 
@@ -62,7 +61,7 @@ def automated_daily_betting(event: scheduler_fn.ScheduledEvent) -> None:
 
 
 @scheduler_fn.on_schedule(
-    schedule='0 * * * *',
+    schedule='55 * * * *',
     memory=MemoryOption.GB_1,
     timeout_sec=300
 )
@@ -82,6 +81,30 @@ def hourly_automated_betting(event: scheduler_fn.ScheduledEvent) -> None:
         logger.info(f"Hourly automated betting result: {result}")
     except Exception as e:
         logger.error(f"Error in hourly automated betting scheduler: {e}", exc_info=True)
+
+
+@https_fn.on_request(
+    timeout_sec=300,
+    memory=MemoryOption.GB_1,
+    cors=cors_options
+)
+def hourly_automated_betting_http(req: https_fn.Request) -> https_fn.Response:
+    """
+    HTTP endpoint for hourly automated betting.
+    Sources games starting in the next hour from ALL leagues, analyzes them, and places bets.
+    """
+    try:
+        logger.info("Hourly automated betting HTTP endpoint triggered")
+        settings = SettingsManager().get_betting_settings()
+        result = BettingManager().execute_hourly_automated_betting(
+            bankroll_percent=settings.bankroll_percent,
+            max_bankroll=settings.max_bankroll,
+            risk_appetite=settings.risk_appetite,
+        )
+        return make_success_response(result)
+    except Exception as e:
+        logger.error(f"Error in hourly automated betting HTTP endpoint: {e}", exc_info=True)
+        return make_error_response(str(e))
 
 
 @scheduler_fn.on_schedule(
@@ -252,22 +275,35 @@ def analyze_suggestion(event: firestore_fn.Event[firestore_fn.DocumentSnapshot])
         # For now just log errors.
 
 
-@firestore_fn.on_document_updated(document="bet_slips/{betId}", timeout_sec=60, memory=options.MemoryOption.GB_1)
+@firestore_fn.on_document_written(document="bet_slips/{betId}", timeout_sec=60, memory=options.MemoryOption.GB_1)
 def place_bet_on_ready(event: firestore_fn.Event[firestore_fn.Change[firestore_fn.DocumentSnapshot]]) -> None:
-    """Triggered when a bet document status changes to 'ready'. Places the bets on Betfair."""
+    """Triggered when a bet document is created or updated to 'ready' status. Places the bets on Betfair."""
     try:
-        before = event.data.before.to_dict()
-        after = event.data.after.to_dict()
-        bet_id = event.params["betId"]
-
-        if before.get("status") == "ready" or after.get("status") != "ready":
+        if not event.data.after.exists:
+            # Document deleted
             return
 
-        logger.info(f"Placing bets for ready intent {bet_id}")
-        manager = BettingManager()
-        manager.prepare_and_place_bets_from_ready_doc(bet_id, after)
-        logger.info(f"Bets placed for {bet_id}")
+        after = event.data.after.to_dict()
+        bet_id = event.params["betId"]
+        status = after.get("status")
 
+        # Check if we should place the bet:
+        # 1. Status is 'ready'
+        # 2. It's either a new document OR the status wasn't 'ready' before
+        
+        is_ready = status == "ready"
+        was_ready = False
+        
+        if event.data.before and event.data.before.exists:
+            before = event.data.before.to_dict()
+            was_ready = before.get("status") == "ready"
+
+        if is_ready and not was_ready:
+            logger.info(f"Placing bets for ready intent {bet_id}")
+            manager = BettingManager()
+            manager.prepare_and_place_bets_from_ready_doc(bet_id, after)
+            logger.info(f"Bets placed for {bet_id}")
+            
     except Exception as e:
         logger.error(f"Error placing bets for {event.params['betId']}: {e}", exc_info=True)
         try:
@@ -461,7 +497,7 @@ def check_bet_results(req: https_fn.Request) -> https_fn.Response:
         return make_error_response(str(e))
 
 
-@scheduler_fn.on_schedule(schedule='*/30 * * * *', timeout_sec=300, memory=options.MemoryOption.GB_1)
+@scheduler_fn.on_schedule(schedule='*/15 * * * *', timeout_sec=300, memory=options.MemoryOption.GB_1)
 def automated_check_bet_results(event: scheduler_fn.ScheduledEvent) -> None:
     """
     Automated scheduler to check bet results every 30 minutes.

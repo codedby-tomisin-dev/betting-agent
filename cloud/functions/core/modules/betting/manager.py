@@ -1,7 +1,8 @@
 from datetime import datetime, timezone, date, timedelta
 from random import shuffle
 from typing import Dict, Any, List, Optional
-
+import os
+import uuid
 from pydantic import ValidationError
 
 from core import logger
@@ -188,10 +189,8 @@ class BettingManager:
         
         total_returns = sum(rec.stake * rec.odds for rec in all_recommendations)
         
-        # Calculate total odds as sum of individual odds (for accumulator logic, might differ for singles)
-        # Assuming these are single bets, total odds isn't meaningful for a combined wager unless it's an acca.
-        # But for display, sum is fine or average.
-        total_odds = sum(rec.odds for rec in all_recommendations)
+        # Calculate total odds as weighted average (total_returns / total_stake)
+        total_odds = total_returns / total_stake if total_stake > 0 else 0
         
         # Transform to selections format with simplified items and full details
         selections_items = []
@@ -236,7 +235,7 @@ class BettingManager:
                 "items": selections_items,
                 "wager": {
                     "odds": round(total_odds, 2),
-                    "stake": request.budget,
+                    "stake": round(total_stake, 2),
                     "potential_returns": total_returns
                 }
             },
@@ -277,6 +276,23 @@ class BettingManager:
         Raises:
             Exception: If Betfair API call fails
         """
+        if os.environ.get("FUNCTIONS_EMULATOR") == "true":
+            logger.info("Running locally, skipping actual bet placement.")
+            return {
+                "status": "SUCCESS",
+                "bets": [
+                    {
+                        "market_id": bet.market_id,
+                        "selection_id": bet.selection_id,
+                        "status": "SUCCESS",
+                        "bet_id": f"mock_local_{uuid.uuid4()}",
+                        "average_price_matched": bet.odds,
+                        "size_matched": bet.stake
+                    }
+                    for bet in request.bets
+                ]
+            }
+
         bets_data = [bet.model_dump() for bet in request.bets]
         result = self.betfair.place_bets(bets_data)
         return result
