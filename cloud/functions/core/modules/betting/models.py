@@ -26,6 +26,7 @@ class AnalyzeBetsRequest(BaseModel):
     events: List[dict] = Field(..., min_length=1, description="List of betting events")
     risk_appetite: float = Field(..., ge=1.0, le=5.0, description="Risk level from 1 (safe) to 5 (aggressive)")
     budget: float = Field(..., gt=0, description="Total budget for betting")
+    min_profit: float = Field(default=0.0, ge=0.0, description="Minimum profit required per selection")
 
 
 class GetOddsRequest(BaseModel):

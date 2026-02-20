@@ -55,12 +55,10 @@ class BettingManager:
         """Calculate betting budget as a capped percentage of available balance."""
         return min(available_balance * (bankroll_percent / 100), max_bankroll)
 
-    @staticmethod
-    def _is_valid_bet(stake: float, odds: float) -> bool:
-        """Return True if a bet meets the minimum stake and profit requirements."""
-        min_stake = AUTOMATED_BETTING_OPTIONS.get("MIN_STAKE", 0)
-        min_profit = AUTOMATED_BETTING_OPTIONS.get("MIN_PROFIT", 0)
-        return stake >= min_stake and stake * (odds - 1) >= min_profit
+    def _is_valid_bet(self, stake: float, odds: float) -> bool:
+        """Return True if a bet meets the minimum stake and profit requirements from user settings."""
+        settings = self.settings_manager.get_betting_settings()
+        return stake >= settings.min_stake and stake * (odds - 1) >= settings.min_profit
 
     def get_all_upcoming_games(self, sport: Optional[str] = None, date: Optional[str] = None, competitions: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """
@@ -134,6 +132,7 @@ class BettingManager:
 
         Risk Appetite: {request.risk_appetite}/5.0 (1=very safe, 5=very aggressive)
         Budget: ${request.budget:.2f} (This is the TOTAL budget for all 3 bets combined)
+        Minimum Profit Per Selection: ${request.min_profit:.2f}
 
         Events:
         {all_events_str}
@@ -142,11 +141,13 @@ class BettingManager:
         1. Select exactly 3 bets that offer the best value across ALL events provided.
         2. The total stake of all 3 bets MUST NOT exceed ${request.budget:.2f}.
         3. Allocate the budget wisely among the 3 bets based on confidence and value.
-        4. **IMPORTANT**: You MUST use the EXACT event names, market names, and selection names as provided above. 
+        4. Each selection MUST generate a profit of AT LEAST ${request.min_profit:.2f} (Profit = Stake * (Odds - 1)).
+        5. **PREFER HIDDEN GEMS**: Mildly prefer selecting "Hidden Gems" where available. A hidden gem is a selection with rewarding odds (e.g., > 1.45) but which also has a disproportionately high probability of winning based on your research.
+        6. **IMPORTANT**: You MUST use the EXACT event names, market names, and selection names as provided above. 
            Do NOT modify them in any way (e.g., do not change "v" to "vs", do not add/remove spaces, do not change capitalization).
            The names must match EXACTLY as they appear in the data above.
 
-        Use web search to research recent team form, head-to-head records, any relevant recent news. Provide a list of recommended bets that offer good value while strictly respecting the budget constraint."""
+        Use web search to research recent team form, head-to-head records, any relevant recent news. Provide a list of recommended bets that offer good value while strictly respecting the budget constraint and minimum profit requirements."""
 
         logger.info(f"Analyzing {len(events)} events with total budget ${request.budget:.2f}")
         
@@ -295,6 +296,7 @@ class BettingManager:
 
         bets_data = [bet.model_dump() for bet in request.bets]
         result = self.betfair.place_bets(bets_data)
+        logger.info(f"Bet placement response: {result}")
         return result
     
     def get_balance(self) -> Dict[str, Any]:
@@ -349,16 +351,8 @@ class BettingManager:
             target_date_obj = datetime.now(timezone.utc).date()
             target_date_str = target_date_obj.isoformat()
 
-        # Idempotency check
-        existing_bets = self.repo.get_matches_by_date(target_date_str)
-        if existing_bets:
-            logger.info(f"Bet intent already exists for {target_date_str}, skipping creation.")
-            # Return the first existing bet
-            return {
-                "status": "existing", 
-                "message": f"Bet intent already exists for {target_date_str}",
-                "bet": existing_bets[0]
-            }
+        # Idempotency check (REMOVED)
+        # We no longer prevent creating multiple bets for the same day.
 
         # Get current balance
         balance_info = self.get_balance()
@@ -492,28 +486,12 @@ class BettingManager:
     ) -> Dict[str, Any]:
         """
         Executes hourly automated betting logic:
-        1. Checks if any active automated bets exist (to prevent stacking risk).
-        2. Sources "Next Games" (next 1h) from ALL leagues.
-        3. Analyzes and auto-bets.
+        1. Sources "Next Games" (next 1h) from ALL leagues.
+        2. Analyzes and auto-bets.
         """
         logger.info("Starting hourly automated betting execution")
 
-        # 1. Sequential Check: Ensure no active automated bets
-        try:
-            # We check for any bets that are 'placed' or 'started' but not finished
-            active_placed_bets = self.repo.get_placed_bets(limit=1)
-            if active_placed_bets:
-                logger.info("Active placed bets found. Skipping hourly execution to prevent stacking risk.")
-                return {
-                    "status": "skipped",
-                    "reason": "Active bets in progress"
-                }
-        except Exception as e:
-            logger.error(f"Error checking active bets: {e}")
-            # Fail safe or continue? Better to fail safe.
-            return {"status": "error", "reason": f"Failed to check active bets: {e}"}
-
-        # 2. Source Games (Next 1 Hour)
+        # 1. Source Games (Next 1 Hour)
         try:
             now = datetime.now(timezone.utc)
             one_hour_later = now + timedelta(hours=1)
@@ -552,7 +530,7 @@ class BettingManager:
             logger.error(f"Error sourcing hourly games: {e}")
             return {"status": "error", "reason": f"Sourcing failed: {e}"}
 
-        # 3. Calculate Budget
+        # 2. Calculate Budget
         balance_info = self.get_balance()
         available_balance = balance_info.get("available_balance", 0)
         
@@ -563,12 +541,14 @@ class BettingManager:
         budget = self._calculate_budget(available_balance, bankroll_percent, max_bankroll)
         logger.info(f"Hourly Budget: ${budget:.2f}")
 
-        # 4. AI Analysis
+        # 3. AI Analysis
         try:
+            settings = self.settings_manager.get_betting_settings()
             analysis_request = AnalyzeBetsRequest(
                 events=events,
                 risk_appetite=risk_appetite,
-                budget=budget
+                budget=budget,
+                min_profit=settings.min_profit
             )
             
             recommendations = self.analyze_betting_opportunities(analysis_request)
@@ -583,7 +563,7 @@ class BettingManager:
             logger.error(f"Error during AI analysis: {e}")
             return {"status": "error", "reason": f"AI analysis failed: {e}"}
 
-        # 5. Auto-Stake (Create 'ready' bet)
+        # 4. Auto-Stake (Create 'ready' bet)
         try:
             # Construct Bet Intent Data directly
             bet_data = {
@@ -643,12 +623,8 @@ class BettingManager:
         
         for suggestion in suggestions:
             try:
-                # Check if bet intent already exists for this date (idempotency)
-                existing_bets = self.repo.get_matches_by_date(target_date_str)
-                if existing_bets:
-                    logger.info(f"Bet intent already exists for {target_date_str}, deleting suggestion.")
-                    suggestion_repo.delete_suggestion(suggestion['id'])
-                    continue
+                # Check if bet intent already exists for this date (idempotency) - REMOVED
+                # We no longer delete suggestions just because a bet exists for the day.
 
                 # Prepare bet data from suggestion
                 # If suggestion is already analyzed, preserve that state

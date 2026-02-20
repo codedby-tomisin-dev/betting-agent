@@ -209,11 +209,15 @@ def analyze_bet_intent(event: firestore_fn.Event[firestore_fn.DocumentSnapshot])
         budget = preferences.get("budget", 10.0)
         risk_appetite = preferences.get("risk_appetite", 3.0)
         
+        settings = SettingsManager().get_betting_settings()
+        min_profit = preferences.get("min_profit", settings.min_profit)
+        
         # Create AnalyzeBetsRequest object
         analysis_request = AnalyzeBetsRequest(
             events=data.get("events", []),
             risk_appetite=risk_appetite,
-            budget=budget
+            budget=budget,
+            min_profit=min_profit
         )
         
         manager = BettingManager()
@@ -256,11 +260,15 @@ def analyze_suggestion(event: firestore_fn.Event[firestore_fn.DocumentSnapshot])
         budget = preferences.get("budget", 10.0)
         risk_appetite = preferences.get("risk_appetite", 3.0)
         
+        settings = SettingsManager().get_betting_settings()
+        min_profit = preferences.get("min_profit", settings.min_profit)
+        
         # Create AnalyzeBetsRequest object
         analysis_request = AnalyzeBetsRequest(
             events=data.get("events", []),
             risk_appetite=risk_appetite,
-            budget=budget
+            budget=budget,
+            min_profit=min_profit
         )
         
         manager = BettingManager()
@@ -452,6 +460,7 @@ def analyze_bets(req: https_fn.Request) -> https_fn.Response:
 
     data.setdefault('risk_appetite', settings_manager.get_setting('RISK_APPETITE', 3))
     data.setdefault('budget', settings_manager.get_setting('BUDGET', settings_manager.get_setting('DEFAULT_BUDGET', 100)))
+    data.setdefault('min_profit', settings_manager.get_setting('MIN_PROFIT', 0.0))
 
     analysis_request = AnalyzeBetsRequest(**data)
     

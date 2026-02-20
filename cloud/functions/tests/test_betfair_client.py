@@ -129,22 +129,21 @@ def test_search_market():
             mock_competition.competition.name = "Test League"
             mock_client.betting.list_competitions.return_value = [mock_competition]
             
-            # Mock market catalogue
-            mock_market = Mock()
-            mock_market.market_id = "1.123"
-            mock_market.event.name = "Test Match"
-            mock_market.market_start_time = "2025-01-01T15:00:00Z"
-            mock_market.competition.name = "Test League"
-            mock_market.description.market_type = "MATCH_ODDS"
-            
-            mock_runner = Mock()
-            mock_runner.selection_id = 12345
-            mock_runner.runner_name = "Team A"
-            mock_market.runners = [mock_runner]
+            # Mock market catalogue as dicts (since lightweight=True is used)
+            mock_market = {
+                "marketId": "1.123",
+                "marketStartTime": "2025-01-01T15:00:00Z",
+                "event": {"name": "Test Match"},
+                "competition": {"name": "Test League"},
+                "description": {"marketType": "MATCH_ODDS"},
+                "runners": [
+                    {"selectionId": 12345, "runnerName": "Team A"}
+                ]
+            }
             
             mock_client.betting.list_market_catalogue.return_value = [mock_market]
             
-            # Mock market books
+            # Mock market books (also dicts or objects with runners as objects, but let's mock the necessary parts)
             mock_book = Mock()
             mock_book.market_id = "1.123"
             mock_runner_book = Mock()

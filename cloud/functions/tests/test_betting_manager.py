@@ -29,32 +29,8 @@ def test_get_bet_returns_data(betting_manager):
     betting_manager.repo.get_bet.assert_called_once_with("test_bet_123")
 
 
-def test_idempotency_existing_bet(betting_manager):
-    """Test idempotency: existing bet found (replaces verify_idempotency.py case 1)."""
-    target_date = "2025-01-01"
-    
-    # Mock existing bet
-    betting_manager.repo.get_matches_by_date.return_value = [
-        {"id": "existing_bet_id", "target_date": target_date}
-    ]
-    
-    # Mock balance
-    betting_manager.get_balance = MagicMock(return_value={"available_balance": 100})
-    
-    result = betting_manager.execute_automated_betting(
-        competitions=["Test Comp"],
-        bankroll_percent=10,
-        max_bankroll=10,
-        risk_appetite=3,
-        target_date=target_date
-    )
-    
-    assert result["status"] == "existing"
-    assert result["bet"]["id"] == "existing_bet_id"
-
-
-def test_idempotency_no_existing_bet(betting_manager, sample_event):
-    """Test idempotency: no existing bet, proceeds to create a suggestion."""
+def test_execute_automated_betting_creates_suggestion(betting_manager, sample_event):
+    """Test execute_automated_betting proceeds to create a suggestion."""
     target_date = "2025-01-01"
 
     betting_manager.repo.get_matches_by_date.return_value = []
@@ -129,6 +105,8 @@ def test_get_balance(betting_manager):
 def test_place_bet(betting_manager):
     """Test placing bets through manager."""
     from core.modules.betting.models import PlaceBetRequest
+    import os
+    from unittest.mock import patch
     
     bets = [
         {
@@ -157,7 +135,8 @@ def test_place_bet(betting_manager):
         ]
     }
     
-    result = betting_manager.place_bet(request)
+    with patch.dict(os.environ, {"FUNCTIONS_EMULATOR": "false"}):
+        result = betting_manager.place_bet(request)
     
     assert result["status"] == "SUCCESS"
     assert len(result["bets"]) == 1
@@ -169,7 +148,8 @@ def test_analyze_betting_opportunities(betting_manager, sample_event):
     data = AnalyzeBetsRequest(
         events=[sample_event],
         risk_appetite=3.0,
-        budget=100.0
+        budget=100.0,
+        min_profit=0.0
     )
     
     # Mock the AI agent response
