@@ -738,13 +738,25 @@ class BettingManager:
 
     def update_placement_result(self, bet_id: str, placement_result: Dict[str, Any]) -> None:
         """Updates a bet document with placement results."""
+        status = placement_result.get("status", "SUCCESS")
+        
+        # If overall status is 'FAILURE', or there are no actual bet_ids, mark as failed
+        bets = placement_result.get("bets", [])
+        has_bet_ids = any(bet.get("bet_id") for bet in bets)
+        
+        if status == "FAILURE" or not has_bet_ids:
+            doc_status = "failed"
+            logger.error(f"Bet placement failed for {bet_id}, marking as failed. Result: {placement_result}")
+        else:
+            doc_status = "placed"
+
         update_data = {
-            "status": "placed",
+            "status": doc_status,
             "placed_at": admin_firestore.SERVER_TIMESTAMP,
             "placement_results": placement_result,
         }
         self.repo.update_bet(bet_id, update_data)
-        logger.info(f"Updated bet {bet_id} with placement results")
+        logger.info(f"Updated bet {bet_id} with placement results (status: {doc_status})")
 
     def prepare_and_place_bets_from_ready_doc(self, bet_id: str, after_data: dict) -> None:
         """
@@ -955,7 +967,8 @@ class BettingManager:
             betfair_ids = [order.get("bet_id") for order in placed_orders if order.get("bet_id")]
             
             if not betfair_ids:
-                logger.warning(f"No Betfair IDs found for placed bet doc {bet_id}")
+                logger.warning(f"No Betfair IDs found for placed bet doc {bet_id}. Marking as failed.")
+                self.mark_bet_failed(bet_id, "No Betfair IDs found in placement_results")
                 continue
                 
             try:
