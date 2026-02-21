@@ -16,3 +16,4 @@ class BettingSettings(BaseModel):
     min_stake: float = Field(default_factory=lambda: AUTOMATED_BETTING_OPTIONS["MIN_STAKE"])
     min_profit: float = Field(default_factory=lambda: AUTOMATED_BETTING_OPTIONS["MIN_PROFIT"])
     default_budget: float = Field(default_factory=lambda: AUTOMATED_BETTING_OPTIONS["DEFAULT_BUDGET"])
+    automation_enabled: bool = Field(default_factory=lambda: AUTOMATED_BETTING_OPTIONS["AUTOMATION_ENABLED"])

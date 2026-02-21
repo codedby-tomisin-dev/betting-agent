@@ -49,6 +49,11 @@ def automated_daily_betting(event: scheduler_fn.ScheduledEvent) -> None:
     try:
         logger.info("Automated daily betting scheduler triggered")
         settings = SettingsManager().get_betting_settings()
+        
+        if not settings.automation_enabled:
+            logger.info("Automation is disabled in settings. Skipping execution.")
+            return
+
         result = BettingManager().execute_automated_betting(
             competitions=RELIABLE_COMPETITIONS,
             bankroll_percent=settings.bankroll_percent,
@@ -74,6 +79,11 @@ def hourly_automated_betting(event: scheduler_fn.ScheduledEvent) -> None:
     try:
         logger.info("Hourly automated betting scheduler triggered")
         settings = SettingsManager().get_betting_settings()
+        
+        if not settings.automation_enabled:
+            logger.info("Automation is disabled in settings. Skipping execution.")
+            return
+
         result = BettingManager().execute_hourly_automated_betting(
             bankroll_percent=settings.bankroll_percent,
             max_bankroll=settings.max_bankroll,
@@ -438,14 +448,18 @@ def place_bet(req: https_fn.Request) -> https_fn.Response:
         return make_error_response(str(e))
 
 
-@https_fn.on_call(cors=cors_options)
-def get_balance(req: https_fn.Request) -> https_fn.Response:
-    """Get wallet balance from Betfair Exchange."""
+@https_fn.on_request(timeout_sec=60, memory=options.MemoryOption.MB_256)
+def refresh_balance(req: https_fn.Request) -> https_fn.Response:
+    """Force sync the wallet balance with Betfair and update Firestore."""
     try:
-        result = BettingManager().get_balance()
-        return make_success_response(data=result)
+        from core.modules.wallet.service import WalletService
+        wallet = WalletService().sync_balance()
+        if wallet:
+            return make_success_response({"status": "success", "balance": wallet.amount, "currency": wallet.currency})
+        else:
+            return make_error_response("Failed to sync wallet")
     except Exception as e:
-        logger.error(f"Get balance error: {e}")
+        logger.error(f"Refresh balance error: {e}")
         return make_error_response(str(e))
 
 
@@ -689,6 +703,31 @@ def analyze_finished_hourly_bet(event: firestore_fn.Event[firestore_fn.Change[fi
 
     except Exception as e:
         logger.error(f"Error analyzing finished bet {event.params['betId']} for learnings: {e}", exc_info=True)
+
+
+@https_fn.on_request(timeout_sec=540, memory=options.MemoryOption.GB_1)
+def learn_from_all_bets(req: https_fn.Request) -> https_fn.Response:
+    """
+    HTTP Callable to manually trigger a bulk learning analysis 
+    on all currently finished bets in parallel.
+    """
+    try:
+        from core.modules.learnings.manager import LearningsManager
+        
+        # We can extract a limit parameter from data if provided, else default to 100
+        limit = req.data.get("limit", 100) if isinstance(req.data, dict) else 100
+        
+        manager = LearningsManager()
+        count = manager.analyze_all_finished_bets(limit=limit)
+        
+        return make_success_response({
+            "status": "success",
+            "message": f"Successfully analyzed {count} finished bets and updated the learning document."
+        })
+    except Exception as e:
+        logger.error(f"Error in learn_from_all_bets callable: {e}", exc_info=True)
+        return make_error_response(str(e), as_dict=True)
+
 
 
 @https_fn.on_request(cors=cors_options)

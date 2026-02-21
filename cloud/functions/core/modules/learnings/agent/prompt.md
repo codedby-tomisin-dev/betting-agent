@@ -14,7 +14,7 @@ Based on this analysis, rewrite the **Current Learnings Document** to incorporat
 
 ### Output Format
 You MUST output the completely rewritten markdown content for the "Learnings" document.
-Do NOT just append a log of this specific bet. Instead, synthesize the lessons into generalized rules or patterns that the betting strategist AI can use in the future.
+Do NOT just append a log of this specific bet. You must wholesale rewrite the document. Discard any obsolete learnings, fix conflicting rules, and synthesize the lessons into generalized rules or patterns that the betting strategist AI can use in the future.
 
 If there are no new lessons to be learned (e.g. standard expected variance), you should still return the current document, perhaps with a minor note reinforcing an existing rule.
 

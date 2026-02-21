@@ -8,6 +8,7 @@ export interface BettingSettings {
     USE_RELIABLE_TEAMS: boolean;
     MIN_STAKE: number;
     MIN_PROFIT: number;
+    AUTOMATION_ENABLED: boolean;
 }
 
 /**
@@ -20,6 +21,7 @@ export const DEFAULT_SETTINGS: BettingSettings = {
     USE_RELIABLE_TEAMS: true,
     MIN_STAKE: 1.0,
     MIN_PROFIT: 0.02,
+    AUTOMATION_ENABLED: true,
 };
 
 /**

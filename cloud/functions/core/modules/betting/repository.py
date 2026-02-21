@@ -130,6 +130,21 @@ class BetRepository(BaseRepository):
             logger.error(f"Error retrieving active bets: {e}")
             raise e
 
+    def get_all_finished_bets(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """
+        Retrieves all finished bets.
+        
+        Returns:
+            List of finished bet documents
+        """
+        try:
+            # Note: We order by finished_at descending so we get most recent.
+            query = self.collection.where("status", "==", "finished").order_by("finished_at", direction=admin_firestore.Query.DESCENDING).limit(limit)
+            return self._query_to_list(query)
+        except Exception as e:
+            logger.error(f"Error retrieving finished bets: {e}")
+            raise e
+
     def get_bet_history(
         self, 
         limit: int = 20, 

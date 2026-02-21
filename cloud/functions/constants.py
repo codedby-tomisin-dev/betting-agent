@@ -13,7 +13,8 @@ AUTOMATED_BETTING_OPTIONS = {
     "MIN_STAKE": 0,         # Minimum stake per bet (Betfair requirement)
     "MIN_PROFIT": 0,        # Minimum profit per bet
     "MIN_MATCHED_LIQUIDITY": 500, # Minimum volume required on a market to participate
-    "DEFAULT_BUDGET": 100
+    "DEFAULT_BUDGET": 100,
+    "AUTOMATION_ENABLED": True # Toggle for all scheduled automated bets
 }
 
 # Reliable teams by competition (competitions derived from keys at runtime)

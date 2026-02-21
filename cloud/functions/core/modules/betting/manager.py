@@ -498,12 +498,20 @@ class BettingManager:
         """
         logger.info("Starting hourly automated betting execution")
 
-        # 0. Check for active bets (Constraint)
-        active_bets = self.repo.get_active_bets()
-        active_hourly_bets = [b for b in active_bets if b.get("source") == "hourly_automated"]
-        if active_hourly_bets:
-            logger.info("Skipping automated hourly execution: Active hourly_automated bets currently exist.")
-            return {"status": "skipped", "reason": "Active hourly_automated bets exist"}
+        # 1. Sequential Check: Ensure no active automated bets
+        try:
+            # We check for any bets that are 'placed' or 'started' but not finished
+            active_placed_bets = self.repo.get_placed_bets(limit=1)
+            if active_placed_bets:
+                logger.info("Active placed bets found. Skipping hourly execution to prevent stacking risk.")
+                return {
+                    "status": "skipped",
+                    "reason": "Active bets in progress"
+                }
+        except Exception as e:
+            logger.error(f"Error checking active bets: {e}")
+            # Fail safe or continue? Better to fail safe.
+            return {"status": "error", "reason": f"Failed to check active bets: {e}"}
 
         # 1. Source Games (Next 1 Hour)
         try:
@@ -515,20 +523,13 @@ class BettingManager:
             
             logger.info(f"Sourcing games between {from_time} and {to_time} for reliable competitions")
             
-            events = []
-            for competition in RELIABLE_COMPETITIONS:
-                try:
-                    comp_events = self.betfair.search_market(
-                        sport="Soccer",
-                        competitions=[competition],
-                        from_time=from_time,
-                        to_time=to_time,
-                        max_results=10,
-                        all_markets=True # Get side markets like Over/Under for better options
-                    )
-                    events.extend(comp_events)
-                except Exception as e:
-                    logger.error(f"Error fetching hourly odds for {competition}: {e}")
+            events = self.betfair.search_market(
+                sport="Soccer",
+                from_time=from_time,
+                to_time=to_time,
+                max_results=40,
+                all_markets=True # Get side markets like Over/Under for better options
+            )
             
             if not events:
                 logger.info("No reliable games found starting in the next hour.")
@@ -1055,6 +1056,13 @@ class BettingManager:
                     # Sync wallet if this bet is newly finished
                     if is_finished:
                         self.get_wallet_service().sync_balance()
+                        
+                        # Trigger learnings analysis for this finished bet
+                        try:
+                            full_bet_data = {**bet_doc, **update_data}
+                            LearningsManager().analyze_finished_bet(full_bet_data)
+                        except Exception as le:
+                            logger.error(f"Error triggering learnings analysis for bet {bet_id}: {le}")
                     
             except Exception as e:
                 logger.error(f"Error checking results for bet {bet_id}: {e}")

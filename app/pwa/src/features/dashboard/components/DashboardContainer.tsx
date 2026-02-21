@@ -5,7 +5,7 @@ import { useBets, useWallet } from "@/shared/hooks";
 import { useDashboardStats } from "../hooks/useDashboardStats";
 import { placeBets, fetchSuggestions } from "@/shared/api/bettingApi";
 import { BalanceCard } from "./BalanceCard";
-import { RiskProfileCard } from "./RiskProfileCard";
+import { ControlPanelCard } from "./ControlPanelCard";
 import { RecentBetsListView, UpcomingGamesGrid, BetSlipFab, BetSlipDialog } from "@/features/betting";
 import { BetSlipProvider } from "@/features/betting/context/BetSlipContext";
 import { BentoGrid, BentoCell } from "@/components/ui/bento-grid";
@@ -89,7 +89,7 @@ export function DashboardContainer() {
                         </BentoCell>
 
                         <BentoCell className="col-span-1 md:col-span-2 lg:col-span-2 min-h-[300px]">
-                            <RiskProfileCard />
+                            <ControlPanelCard />
                         </BentoCell>
 
                         <BentoCell className="col-span-1 md:col-span-2 lg:col-span-2 mt-8">
