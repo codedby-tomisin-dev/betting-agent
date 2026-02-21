@@ -509,9 +509,10 @@ class BettingManager:
 
         # 0. Check for active bets (Constraint)
         active_bets = self.repo.get_active_bets()
-        if active_bets:
-            logger.info("Skipping automated hourly execution: Active bets currently exist.")
-            return {"status": "skipped", "reason": "Active bets exist"}
+        active_hourly_bets = [b for b in active_bets if b.get("source") == "hourly_automated"]
+        if active_hourly_bets:
+            logger.info("Skipping automated hourly execution: Active hourly_automated bets currently exist.")
+            return {"status": "skipped", "reason": "Active hourly_automated bets exist"}
 
         # 1. Source Games (Next 1 Hour)
         try:
@@ -782,6 +783,23 @@ class BettingManager:
             "placed_at": admin_firestore.SERVER_TIMESTAMP,
             "placement_results": placement_result,
         }
+        
+        # Immediately fetch updated balance after placing a bet successfully
+        if doc_status == "placed":
+            try:
+                balance_info = self.get_balance()
+                current_balance = balance_info.get("available_balance", 0)
+                
+                bet_doc = self.repo.get_bet(bet_id)
+                if bet_doc:
+                    existing_balance = bet_doc.get("balance", {})
+                    update_data["balance"] = {
+                        **existing_balance,
+                        "current": current_balance
+                    }
+            except Exception as e:
+                logger.error(f"Failed to fetch updated balance after placement for bet {bet_id}: {e}")
+
         self.repo.update_bet(bet_id, update_data)
         logger.info(f"Updated bet {bet_id} with placement results (status: {doc_status})")
 

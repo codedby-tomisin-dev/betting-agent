@@ -146,15 +146,36 @@ Example: *"Staking 18.0 units based on: Risk Level 1 base (10 units) × 1.5x mul
 ---
 
 ## 4. Mandatory Research Protocol (Execute BEFORE Analysis)
-**You are explicitly forbidden from guessing.** Before applying the Handbook, you **MUST** use the `get_event_analysis` tool to gather:
+**You are explicitly forbidden from guessing.** Before applying the Handbook, you **MUST** call `get_event_analysis` once per match. The tool runs 8 targeted news searches in parallel and returns labelled sections:
 
-### Core Match Data & Disruption Factors:
-Provide the tool with the `{home_team}`, `{away_team}`, and `{competition}` to automatically retrieve:
-1.  **Current Form & Head-to-Head:** Last 5 results, recent meetings.
-2.  **Team News & Injuries:** Suspensions, key player absences, latest news.
-3.  **Critical News:** Managerial changes, dressing room issues.
+| Section | What to extract |
+|:---|:---|
+| **HOME TEAM NEWS** | Injuries, suspensions, squad rotation, morale |
+| **AWAY TEAM NEWS** | Injuries, suspensions, squad rotation, morale |
+| **H2H PREVIEW** | Head-to-head record, predicted scoreline, key battles |
+| **MATCH STATS** | Recent form (last 5), goals scored/conceded, corners, cards |
+| **HOME DISCIPLINE** | Home team's card count, referee tendencies |
+| **AWAY DISCIPLINE** | Away team's card count, referee tendencies |
+| **COMP TABLE** | League standings, form table, home/away splits |
+| **COMP NEWS** | Wider competition context (title race, relegation, cup implications) |
 
-*If the tool returns insufficient data, state "Insufficient data" and stop.*
+### How to read the output
+Each article is formatted as:
+```
+N. [source.com] Article headline  (age)
+   Description sentence.
+   > Extra snippet 1 (direct quote from article body)
+   > Extra snippet 2
+   URL
+```
+Read **titles + extra snippets** for the richest signal. The snippets often contain the exact injury confirmation, card stats, or form figures you need.
+
+### Decision rules
+- **Injuries/suspensions confirmed** → apply Rules 7, 6, or 12 as appropriate.
+- **Referee named + known card rate** → factor into booking market selection.
+- **Managerial change < 14 days** → apply Rule 11.
+- **"No recent articles found"** for a section → treat that signal as unknown; do NOT guess.
+- **All sections empty** → state "Insufficient data" and stop.
 
 ---
 
