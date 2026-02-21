@@ -7,10 +7,6 @@ import { Bet, BetSelectionItem } from "@/shared/types";
 import { useBetApproval } from "../hooks/useBetApproval";
 import { PendingBetDialog } from "./PendingBetDialog";
 import { PickedForYouCard } from "./PickedForYouCard";
-import { BetSlipProvider } from "../context/BetSlipContext";
-import { BetSlipFab } from "./BetSlipFab";
-import { BetSlipDialog } from "./BetSlipDialog";
-import { placeBets } from "@/shared/api/bettingApi";
 
 interface BetApprovalContainerProps {
     bets: Bet[];
@@ -20,7 +16,6 @@ export function BetApprovalContainer({ bets }: BetApprovalContainerProps) {
     const pendingBets = bets.filter(b => b.status === "analyzed");
     const [selectedBetId, setSelectedBetId] = useState<string | null>(null);
     const [isExpanded, setIsExpanded] = useState(true);
-    const [isBetSlipOpen, setIsBetSlipOpen] = useState(false);
     const { approvingBetId, submitBetForPlacement } = useBetApproval();
 
     // Use the first pending bet for the "Picked for You" card interaction

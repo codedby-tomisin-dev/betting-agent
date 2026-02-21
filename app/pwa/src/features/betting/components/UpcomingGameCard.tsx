@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Calendar, ChevronRight } from "lucide-react";
-import { BetEvent, BetSelectionItem, MarketOption, SelectionOption } from "@/shared/types";
+import { Calendar } from "lucide-react";
+import { BetEvent, MarketOption, SelectionOption } from "@/shared/types";
 import { format } from "date-fns";
 
 import { MarketOptionsDialog } from "./MarketOptionsDialog";
@@ -10,12 +10,10 @@ import { useBetSlip } from "../context/BetSlipContext";
 
 interface UpcomingGameCardProps {
     game: BetEvent;
-    onAddToTicket?: () => void;
 }
 
 export function UpcomingGameCard({
-    game,
-    onAddToTicket
+    game
 }: UpcomingGameCardProps) {
     const [isMarketsOpen, setIsMarketsOpen] = useState(false);
     const { toggleSelection, isInSlip } = useBetSlip();

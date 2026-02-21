@@ -1,7 +1,7 @@
 "use client";
 
 import { Sparkles, X, ThumbsUp } from "lucide-react";
-import { Button } from "@/components/ui/button";
+
 import { Bet, BetSelectionItem } from "@/shared/types";
 import { BetModel } from "../models/BetModel";
 import { useState } from "react";
@@ -13,7 +13,7 @@ interface PickedForYouCardProps {
     onClick: () => void;
 }
 
-export function PickedForYouCard({ bet, onClick }: PickedForYouCardProps) {
+export function PickedForYouCard({ bet }: PickedForYouCardProps) {
     const model = new BetModel(bet);
     const selections = model.selections;
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -24,10 +24,7 @@ export function PickedForYouCard({ bet, onClick }: PickedForYouCardProps) {
     }
 
     const currentSelection = selections[currentIndex];
-    const remainingCount = selections.length - currentIndex;
-
     // Calculate confidence (mock for now - you can enhance this based on actual data)
-    const confidence = Math.floor(75 + Math.random() * 20); // 75-95%
 
     const handleAccept = () => {
         // Add to bet slip with proper BetSelectionItem structure
@@ -61,26 +58,6 @@ export function PickedForYouCard({ bet, onClick }: PickedForYouCardProps) {
         } else {
             setCurrentIndex(0); // Reset
         }
-    };
-
-    const handleAcceptAll = () => {
-        selections.forEach(selection => {
-            const selectionItem: Omit<BetSelectionItem, 'id'> = {
-                event: selection.event!,
-                market: selection.market || 'Unknown Market',
-                market_name: selection.marketName,
-                selection_name: selection.selectionName,
-                odds: selection.odds || 1,
-                stake: 0,
-                market_id: selection.marketId,
-                selection_id: selection.selectionId,
-                reasoning: selection.reasoning
-            };
-
-            addSelection(selectionItem);
-        });
-        toast.success(`Added all ${selections.length} picks to bet slip!`);
-        setCurrentIndex(0);
     };
 
     // Split event name into teams

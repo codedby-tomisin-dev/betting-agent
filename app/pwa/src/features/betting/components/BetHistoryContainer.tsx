@@ -26,6 +26,7 @@ export function BetHistoryContainer() {
 
     useEffect(() => {
         loadHistory(true);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [statusFilter]);
 
     const loadHistory = async (reset: boolean = false) => {

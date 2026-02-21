@@ -48,7 +48,7 @@ export function groupMarketsByCategory(markets: MarketOption[]): Map<MarketCateg
     });
 
     // Sort markets alphabetically within each category
-    grouped.forEach((marketList, category) => {
+    grouped.forEach((marketList) => {
         marketList.sort((a, b) => a.name.localeCompare(b.name));
     });
 

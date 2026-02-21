@@ -16,8 +16,6 @@ export function RecentBetCard({ betModel, onClick }: RecentBetCardProps) {
     const {
         title,
         targetDate,
-        stake,
-        displayPot,
         profit,
         isFinished,
         isWin,

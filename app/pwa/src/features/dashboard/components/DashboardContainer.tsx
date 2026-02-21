@@ -12,7 +12,7 @@ import { BentoGrid, BentoCell } from "@/components/ui/bento-grid";
 import { Toaster } from "@/components/ui/sonner";
 import { PendingBetDialog } from "@/features/betting/components/PendingBetDialog";
 import { useBetApproval } from "@/features/betting/hooks/useBetApproval";
-import { BetSelectionItem, BetModel } from "@/shared/types";
+import { BetSelectionItem, Bet } from "@/shared/types";
 
 export function DashboardContainer() {
     const { bets, loading, error } = useBets();
@@ -24,7 +24,7 @@ export function DashboardContainer() {
     const { approvingBetId, submitBetForPlacement } = useBetApproval();
 
     // Add state for suggestions
-    const [suggestions, setSuggestions] = useState<BetModel[]>([]);
+    const [suggestions, setSuggestions] = useState<Bet[]>([]);
 
     useEffect(() => {
         const loadSuggestions = async () => {

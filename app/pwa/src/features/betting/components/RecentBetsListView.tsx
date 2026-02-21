@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Bet } from "@/shared/types";
 import { ActiveBetDetailsDialog } from "./ActiveBetDetailsDialog";
@@ -18,7 +18,7 @@ export function RecentBetsListView({ bets }: RecentBetsListViewProps) {
     const [selectedBet, setSelectedBet] = useState<Bet | null>(null);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-    const { recentBets, wins, losses } = useMemo(() => {
+    const { recentBets } = useMemo(() => {
         const sorted = bets
             .filter(b => b.status !== "intent")
             .sort((a, b) => {

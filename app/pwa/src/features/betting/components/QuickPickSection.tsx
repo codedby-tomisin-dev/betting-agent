@@ -305,7 +305,7 @@ export function QuickPickSection({ event, markets, onSelection, isInSlip }: Quic
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
-                            {suggestedMarkets.map((suggestion, idx) => (
+                            {suggestedMarkets.map((suggestion) => (
                                 <button
                                     key={`${suggestion.market.market_id}-${suggestion.selection.selection_id}`}
                                     className={cn(

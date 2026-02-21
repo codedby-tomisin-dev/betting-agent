@@ -1,7 +1,7 @@
 import { httpsCallable } from "firebase/functions";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { functions, db } from "./firebase";
-import { BetSelectionItem, Bet, BetEvent, MarketOption, BetModel } from "@/shared/types";
+import { BetSelectionItem, Bet, BetEvent, MarketOption } from "@/shared/types";
 
 /**
  * Approve a bet intent and queue it for placement
@@ -218,7 +218,7 @@ export const fetchEventMarkets = async (providerEventId: string, marketTypes?: s
 /**
  * Fetch betting suggestions for a specific date
  */
-export const fetchSuggestions = async (date: string): Promise<BetModel[]> => {
+export const fetchSuggestions = async (date: string): Promise<Bet[]> => {
     try {
         const suggestionsRef = collection(db, "suggestions");
         const q = query(suggestionsRef, where("target_date", "==", date));
@@ -234,7 +234,7 @@ export const fetchSuggestions = async (date: string): Promise<BetModel[]> => {
                 approved_at: data.approved_at?.toDate?.()?.toISOString(),
                 placed_at: data.placed_at?.toDate?.()?.toISOString(),
                 target_date: data.target_date
-            } as BetModel;
+            } as Bet;
         });
     } catch (error) {
         console.error("Error fetching suggestions:", error);
