@@ -27,8 +27,7 @@ export function useDashboardStats(bets: Bet[]): DashboardStats {
             ? (wins / finishedBets.length) * 100
             : 0;
 
-        const latestBet = bets[0];
-        const currentBalance = latestBet?.balance?.ending ?? latestBet?.balance?.starting ?? 0;
+        const currentBalance = 0; // Handled directly by Wallet module now
 
         // Calculate profit from the latest finished bet
         const sortedFinishedBets = [...finishedBets].sort((a, b) => {

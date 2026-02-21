@@ -426,26 +426,30 @@ class BetfairExchange(BaseBettingPlatform):
         
         # It seems bet_ids is a direct argument, not inside market_filter for list_cleared_orders
         
-        cleared_orders = self.client.betting.list_cleared_orders(
-            bet_status="SETTLED",
-            bet_ids=bet_ids if bet_ids else None,
-            settled_date_range=filter_kwargs.get("settled_date_range")
-        )
-        
         results = []
-        if cleared_orders and cleared_orders.orders:
-            for order in cleared_orders.orders:
-                results.append({
-                    "bet_id": order.bet_id,
-                    "market_id": order.market_id,
-                    "selection_id": order.selection_id,
-                    "status": "WON" if order.profit > 0 else "LOST", 
-                    "profit": order.profit,
-                    "settled_date": order.settled_date,
-                    "side": order.side,
-                    "price_requested": order.price_requested,
-                    "price_matched": order.price_matched,
-                    "size_settled": order.size_settled
-                })
-                
+        statuses_to_check = ["SETTLED", "VOIDED", "LAPSED", "CANCELLED"]
+
+        for status in statuses_to_check:
+            cleared_orders_response = self.client.betting.list_cleared_orders(
+                bet_status=status,
+                bet_ids=bet_ids if bet_ids else None,
+                settled_date_range=filter_kwargs.get("settled_date_range")
+            )
+            
+            if cleared_orders_response and cleared_orders_response.orders:
+                for order in cleared_orders_response.orders:
+                    # Treat VOIDED/CANCELLED/LAPSED as LOST for profit calculation, with 0 profit (actually order.profit will be 0)
+                    results.append({
+                        "bet_id": order.bet_id,
+                        "market_id": order.market_id,
+                        "selection_id": order.selection_id,
+                        "status": "WON" if order.profit > 0 else (status if status != "SETTLED" else "LOST"), 
+                        "profit": order.profit,
+                        "settled_date": order.settled_date,
+                        "side": order.side,
+                        "price_requested": order.price_requested,
+                        "price_matched": order.price_matched,
+                        "size_settled": order.size_settled
+                    })
+                    
         return results

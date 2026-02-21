@@ -18,7 +18,7 @@ export function useWallet() {
 
     useEffect(() => {
         try {
-            const docRef = doc(db, 'wallet', 'main');
+            const docRef = doc(db, 'wallets', 'main');
 
             const unsubscribe = onSnapshot(docRef, (docSnap) => {
                 if (docSnap.exists()) {

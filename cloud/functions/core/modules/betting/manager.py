@@ -16,6 +16,7 @@ from third_party.betting_platforms.models import Event
 from core.modules.betting.betfair_service import BetfairService
 from core.modules.settings.manager import SettingsManager
 from core.modules.learnings.manager import LearningsManager
+from core.modules.wallet.service import WalletService
 
 
 class BettingManager:
@@ -315,18 +316,9 @@ class BettingManager:
         logger.info(f"Bet placement response: {result}")
         return result
     
-    def get_balance(self) -> Dict[str, Any]:
-        """
-        Get wallet balance from Betfair Exchange.
-        
-        Returns:
-            Dictionary containing balance information
-            
-        Raises:
-            Exception: If Betfair API call fails
-        """
-        result = self.betfair.get_balance()
-        return result
+    def get_wallet_service(self) -> WalletService:
+        """Helper to lazily instantiate WalletService to avoid circular loops."""
+        return WalletService()
     
     def execute_automated_betting(
         self, 
@@ -370,9 +362,8 @@ class BettingManager:
         # Idempotency check (REMOVED)
         # We no longer prevent creating multiple bets for the same day.
 
-        # Get current balance
-        balance_info = self.get_balance()
-        available_balance = balance_info.get("available_balance", 0)
+        # Get current balance from db wallet
+        available_balance = self.get_wallet_service().get_available_balance()
         
         if available_balance <= 0:
             logger.warning("No available balance for automated betting")
@@ -559,8 +550,7 @@ class BettingManager:
             return {"status": "error", "reason": f"Sourcing failed: {e}"}
 
         # 2. Calculate Budget
-        balance_info = self.get_balance()
-        available_balance = balance_info.get("available_balance", 0)
+        available_balance = self.get_wallet_service().get_available_balance()
         
         if available_balance <= 0:
             logger.warning("No available balance for hourly betting")
@@ -787,8 +777,8 @@ class BettingManager:
         # Immediately fetch updated balance after placing a bet successfully
         if doc_status == "placed":
             try:
-                balance_info = self.get_balance()
-                current_balance = balance_info.get("available_balance", 0)
+                wallet = self.get_wallet_service().sync_balance()
+                current_balance = wallet.amount if wallet else 0
                 
                 bet_doc = self.repo.get_bet(bet_id)
                 if bet_doc:
@@ -864,9 +854,8 @@ class BettingManager:
             total_stake = sum(bet.stake for bet in request.bets)
             potential_returns = sum(bet.stake * bet.odds for bet in request.bets)
             
-            # Get current balance for tracking
-            balance_info = self.get_balance()
-            starting_balance = balance_info.get("available_balance", 0)
+            # Get current balance from db wallet
+            starting_balance = self.get_wallet_service().get_available_balance()
             
             # Create selections list for Firestore
             selections_items = []
@@ -1022,18 +1011,20 @@ class BettingManager:
                 
                 if cleared_orders:
                     # Update process logic locally
-                    expected_bet_count = len(placed_orders)
+                    expected_bet_count = len(betfair_ids)
                     existing_settlements = bet_doc.get("settlement_results", [])
                     
                     # Merge logic
                     settlements_map = { 
-                        (s.get("market_id"), s.get("selection_id")): s 
+                        s.get("bet_id"): s 
                         for s in existing_settlements 
+                        if s.get("bet_id")
                     }
                     
                     for new_s in cleared_orders:
-                        key = (new_s.get("market_id"), new_s.get("selection_id"))
-                        settlements_map[key] = new_s # Overwrite with newer data
+                        key = new_s.get("bet_id")
+                        if key:
+                            settlements_map[key] = new_s # Overwrite with newer data
                         
                     merged_results = list(settlements_map.values())
                     total_realized_profit = sum(r.get('profit', 0) for r in merged_results)
@@ -1060,6 +1051,10 @@ class BettingManager:
                     
                     self.repo.update_bet(bet_id, update_data)
                     updated_count += 1
+                    
+                    # Sync wallet if this bet is newly finished
+                    if is_finished:
+                        self.get_wallet_service().sync_balance()
                     
             except Exception as e:
                 logger.error(f"Error checking results for bet {bet_id}: {e}")
