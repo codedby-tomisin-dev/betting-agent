@@ -115,6 +115,21 @@ class BetRepository(BaseRepository):
         except Exception as e:
             logger.error(f"Error retrieving placed bets: {e}")
             raise e
+
+    def get_active_bets(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """
+        Retrieves active bets (bets that have not yet failed or finished).
+        
+        Returns:
+            List of active bet documents
+        """
+        try:
+            query = self.collection.where("status", "in", ["intent", "analyzed", "ready", "processing", "placed"]).limit(limit)
+            return self._query_to_list(query)
+        except Exception as e:
+            logger.error(f"Error retrieving active bets: {e}")
+            raise e
+
     def get_bet_history(
         self, 
         limit: int = 20, 

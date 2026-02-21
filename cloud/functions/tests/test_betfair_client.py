@@ -146,6 +146,7 @@ def test_search_market():
             # Mock market books (also dicts or objects with runners as objects, but let's mock the necessary parts)
             mock_book = Mock()
             mock_book.market_id = "1.123"
+            mock_book.total_matched = 1000
             mock_runner_book = Mock()
             mock_runner_book.selection_id = 12345
             mock_price = Mock()

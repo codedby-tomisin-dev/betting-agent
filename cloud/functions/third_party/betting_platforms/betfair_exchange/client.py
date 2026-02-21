@@ -1,6 +1,7 @@
 from collections import defaultdict
 from datetime import datetime
 from typing import List, Dict, Any, Optional
+from constants import AUTOMATED_BETTING_OPTIONS
 import os
 import uuid
 
@@ -192,6 +193,12 @@ class BetfairExchange(BaseBettingPlatform):
             market_id = market.get('marketId')
             book = books_map.get(market_id)
             if not book:
+                continue
+
+            # Check market liquidity to avoid matches without popular demand
+            min_liquidity = AUTOMATED_BETTING_OPTIONS.get("MIN_MATCHED_LIQUIDITY", 500)
+            if (book.total_matched or 0) < min_liquidity:
+                logger.info(f"Skipping market {market_id} due to low liquidity ({book.total_matched} < {min_liquidity})")
                 continue
 
             event_name = market.get('event', {}).get('name')

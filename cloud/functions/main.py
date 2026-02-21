@@ -18,6 +18,7 @@ from core.modules.settings.manager import SettingsManager
 from utils.responses import make_error_response, make_success_response
 from constants import RELIABLE_TEAMS, RELIABLE_COMPETITIONS, RELIABLE_ALL_TEAMS
 from core.modules.notifications import NotificationManager
+from core.modules.learnings.manager import LearningsManager
 
 
 # For cost control, you can set the maximum number of containers that can be
@@ -308,9 +309,32 @@ def place_bet_on_ready(event: firestore_fn.Event[firestore_fn.Change[firestore_f
 
         if is_ready and not was_ready:
             logger.info(f"Placing bets for ready intent {bet_id}")
-            manager = BettingManager()
-            manager.prepare_and_place_bets_from_ready_doc(bet_id, after)
-            logger.info(f"Bets placed for {bet_id}")
+            
+            db = firestore.client()
+            transaction = db.transaction()
+            doc_ref = db.collection("bet_slips").document(bet_id)
+            
+            @firestore.transactional
+            def proceed_with_placement(transaction, doc_ref):
+                snapshot = doc_ref.get(transaction=transaction)
+                if not snapshot.exists:
+                    return None
+                    
+                current_data = snapshot.to_dict()
+                if current_data.get("status") != "ready":
+                    return None
+                    
+                transaction.update(doc_ref, {"status": "processing"})
+                return current_data
+                
+            transaction_data = proceed_with_placement(transaction, doc_ref)
+            
+            if transaction_data:
+                manager = BettingManager()
+                manager.prepare_and_place_bets_from_ready_doc(bet_id, transaction_data)
+                logger.info(f"Bets placed for {bet_id}")
+            else:
+                logger.info(f"Bet {bet_id} is no longer 'ready'. Skipping to avoid duplicate placement.")
             
     except Exception as e:
         logger.error(f"Error placing bets for {event.params['betId']}: {e}", exc_info=True)
@@ -634,3 +658,47 @@ def migrate_bet_slips(req: https_fn.Request) -> https_fn.Response:
             content_type="application/json"
         )
 
+
+@firestore_fn.on_document_updated(document="bet_slips/{betId}", timeout_sec=540, memory=options.MemoryOption.GB_1)
+def analyze_finished_hourly_bet(event: firestore_fn.Event[firestore_fn.Change[firestore_fn.DocumentSnapshot]]) -> None:
+    """
+    Triggered when a bet slip document is updated.
+    Checks if a bet slip from 'hourly_automated' just transitioned to 'finished'.
+    If so, sends it to the Learning Agent to extract insights and update learnings.
+    """
+    try:
+        before_data = event.data.before.to_dict() if event.data.before else {}
+        after_data = event.data.after.to_dict() if event.data.after else {}
+
+        if not after_data:
+            return
+
+        bet_id = event.params["betId"]
+        source = after_data.get("source")
+        target_status = after_data.get("status")
+        previous_status = before_data.get("status")
+
+        # Only process hourly automated bets that JUST finished
+        if source != "hourly_automated" or target_status != "finished" or previous_status == "finished":
+            return
+
+        logger.info(f"Hourly automated bet {bet_id} finished. Passing to Learnings Agent.")
+        
+        manager = LearningsManager()
+        manager.analyze_finished_bet(after_data)
+
+    except Exception as e:
+        logger.error(f"Error analyzing finished bet {event.params['betId']} for learnings: {e}", exc_info=True)
+
+
+@https_fn.on_request(cors=cors_options)
+def test_learnings_http(req: https_fn.Request) -> https_fn.Response:
+    """Manual trigger to test LearningsManager via HTTP."""
+    try:
+        data = req.get_json() if req.is_json else {}
+        manager = LearningsManager()
+        manager.analyze_finished_bet(data)
+        return make_success_response({"status": "success"})
+    except Exception as e:
+        logger.error(f"Error in test_learnings_http: {e}", exc_info=True)
+        return make_error_response(str(e))

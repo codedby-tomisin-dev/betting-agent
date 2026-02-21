@@ -15,6 +15,8 @@ from constants import AUTOMATED_BETTING_OPTIONS, RELIABLE_COMPETITIONS
 from third_party.betting_platforms.models import Event
 from core.modules.betting.betfair_service import BetfairService
 from core.modules.settings.manager import SettingsManager
+from core.modules.learnings.manager import LearningsManager
+
 
 class BettingManager:
     """Manager for betting analysis and recommendations"""
@@ -127,12 +129,20 @@ class BettingManager:
         
         all_events_str = "\n".join(requests_prompt)
 
+        risk_level = round(request.risk_appetite)
+
+        # Get the centralized learnings
+        try:
+            learnings_manager = LearningsManager()
+            learnings_markdown = learnings_manager.get_current_learnings()
+        except Exception as e:
+            logger.error(f"Failed to fetch learnings: {e}")
+            learnings_markdown = ""
+            
+        learnings_section = f"\n\n    === HISTORICAL LEARNINGS ===\n    {learnings_markdown}\n    (Use these learnings to avoid past mistakes and validate your reasoning)" if learnings_markdown else ""
+
         # Build prompt for ALL events
         prompt = f"""Analyze these betting opportunities and provide exactly 3 best betting recommendations based on the risk appetite and budget provided.
-
-        Risk Appetite: {request.risk_appetite}/5.0 (1=very safe, 5=very aggressive)
-        Budget: ${request.budget:.2f} (This is the TOTAL budget for all 3 bets combined)
-        Minimum Profit Per Selection: ${request.min_profit:.2f}
 
         Events:
         {all_events_str}
@@ -142,12 +152,18 @@ class BettingManager:
         2. The total stake of all 3 bets MUST NOT exceed ${request.budget:.2f}.
         3. Allocate the budget wisely among the 3 bets based on confidence and value.
         4. Each selection MUST generate a profit of AT LEAST ${request.min_profit:.2f} (Profit = Stake * (Odds - 1)).
-        5. **PREFER HIDDEN GEMS**: Mildly prefer selecting "Hidden Gems" where available. A hidden gem is a selection with rewarding odds (e.g., > 1.45) but which also has a disproportionately high probability of winning based on your research.
-        6. **IMPORTANT**: You MUST use the EXACT event names, market names, and selection names as provided above. 
+        5. **IMPORTANT**: You MUST use the EXACT event names, market names, and selection names as provided above. 
            Do NOT modify them in any way (e.g., do not change "v" to "vs", do not add/remove spaces, do not change capitalization).
            The names must match EXACTLY as they appear in the data above.
+        {learnings_section}
+
+        USER PREFERENCES (STRICTLY ADHERE TO THESE):
+        - Risk Appetite: {request.risk_appetite}/5.0 -> Use Risk Level {risk_level} from your Handbook.
+        - Budget: ${request.budget:.2f} (This is the TOTAL budget for all 3 bets combined)
+        - Minimum Profit Per Selection: ${request.min_profit:.2f}
 
         Use web search to research recent team form, head-to-head records, any relevant recent news. Provide a list of recommended bets that offer good value while strictly respecting the budget constraint and minimum profit requirements."""
+
 
         logger.info(f"Analyzing {len(events)} events with total budget ${request.budget:.2f}")
         
@@ -491,34 +507,45 @@ class BettingManager:
         """
         logger.info("Starting hourly automated betting execution")
 
+        # 0. Check for active bets (Constraint)
+        active_bets = self.repo.get_active_bets()
+        if active_bets:
+            logger.info("Skipping automated hourly execution: Active bets currently exist.")
+            return {"status": "skipped", "reason": "Active bets exist"}
+
         # 1. Source Games (Next 1 Hour)
         try:
             now = datetime.now(timezone.utc)
-            one_hour_later = now + timedelta(hours=1)
+            one_hour_later = now + timedelta(hours=3)
             
             from_time = now.strftime("%Y-%m-%dT%H:%M:%S.000Z")
             to_time = one_hour_later.strftime("%Y-%m-%dT%H:%M:%S.000Z")
             
-            logger.info(f"Sourcing games between {from_time} and {to_time}")
+            logger.info(f"Sourcing games between {from_time} and {to_time} for reliable competitions")
             
-            # Search "Soccer" - no competition filter = all leagues
-            # max_results=40 (API limit/default)
-            events = self.betfair.search_market(
-                sport="Soccer",
-                from_time=from_time,
-                to_time=to_time,
-                max_results=40,
-                all_markets=True # Get side markets like Over/Under for better options
-            )
+            events = []
+            for competition in RELIABLE_COMPETITIONS:
+                try:
+                    comp_events = self.betfair.search_market(
+                        sport="Soccer",
+                        competitions=[competition],
+                        from_time=from_time,
+                        to_time=to_time,
+                        max_results=10,
+                        all_markets=True # Get side markets like Over/Under for better options
+                    )
+                    events.extend(comp_events)
+                except Exception as e:
+                    logger.error(f"Error fetching hourly odds for {competition}: {e}")
             
             if not events:
-                logger.info("No games found starting in the next hour.")
+                logger.info("No reliable games found starting in the next hour.")
                 return {
                     "status": "skipped",
-                    "reason": "No games found next hour"
+                    "reason": "No reliable games found next hour"
                 }
 
-            logger.info(f"Found {len(events)} games in the next hour.")
+            logger.info(f"Found {len(events)} reliable games in the next hour.")
             
             # Optional: Filter or Shuffle?
             # Shuffle to avoid bias to just the first few returned if we have many
@@ -745,8 +772,8 @@ class BettingManager:
         has_bet_ids = any(bet.get("bet_id") for bet in bets)
         
         if status == "FAILURE" or not has_bet_ids:
-            doc_status = "failed"
-            logger.error(f"Bet placement failed for {bet_id}, marking as failed. Result: {placement_result}")
+            doc_status = "rejected"
+            logger.error(f"Bet placement failed for {bet_id}, marking as rejected. Result: {placement_result}")
         else:
             doc_status = "placed"
 
@@ -888,7 +915,7 @@ class BettingManager:
             placement_result = self.place_bet(request)
             
             # 3. Update the document with results
-            status = "placed" if placement_result.get("status") == "SUCCESS" else "failed"
+            status = "placed" if placement_result.get("status") == "SUCCESS" else "rejected"
             if placement_result.get("status") == "PARTIAL_FAILURE":
                 status = "partial"
                 
@@ -928,22 +955,22 @@ class BettingManager:
             logger.error(f"Failed to place manual bet {bet_id}: {e}")
             # Mark as failed in DB
             self.repo.update_bet(bet_id, {
-                "status": "failed", 
+                "status": "rejected", 
                 "error": str(e),
-                "failed_at": datetime.now(timezone.utc)
+                "rejected_at": datetime.now(timezone.utc)
             })
             raise e
 
-    def mark_bet_failed(self, bet_id: str, error: str) -> None:
+    def mark_bet_rejected(self, bet_id: str, error: str) -> None:
         """
-        Marks a bet document as failed.
+        Marks a bet document as rejected.
         """
         update_data = {
-            "status": "failed",
+            "status": "rejected",
             "error": error
         }
         self.repo.update_bet(bet_id, update_data)
-        logger.info(f"Marked bet {bet_id} as failed")
+        logger.info(f"Marked bet {bet_id} as rejected")
         
     def check_bet_results(self) -> Dict[str, Any]:
         """
@@ -967,8 +994,8 @@ class BettingManager:
             betfair_ids = [order.get("bet_id") for order in placed_orders if order.get("bet_id")]
             
             if not betfair_ids:
-                logger.warning(f"No Betfair IDs found for placed bet doc {bet_id}. Marking as failed.")
-                self.mark_bet_failed(bet_id, "No Betfair IDs found in placement_results")
+                logger.warning(f"No Betfair IDs found for placed bet doc {bet_id}. Marking as rejected.")
+                self.mark_bet_rejected(bet_id, "No Betfair IDs found in placement_results")
                 continue
                 
             try:

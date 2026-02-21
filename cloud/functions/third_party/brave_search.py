@@ -26,7 +26,7 @@ class BraveSearch(BaseThirdParty):
         self,
         query: str,
         count: int = 20,
-        country: str = "us",
+        country: str = "uk",
         search_lang: str = "en",
         freshness: Optional[str] = None,
         safe_search: Optional[str] = None,
