@@ -1,4 +1,7 @@
-export function formatTimestamp(timestamp: any): string {
+type FirestoreTimestamp = { toDate?: () => Date; seconds?: number; _seconds?: number };
+type DateInput = Date | string | number | FirestoreTimestamp | null | undefined;
+
+export function formatTimestamp(timestamp: DateInput): string {
     if (!timestamp) return 'N/A';
 
     let date: Date;
@@ -8,12 +11,13 @@ export function formatTimestamp(timestamp: any): string {
     } else if (typeof timestamp === 'string' || typeof timestamp === 'number') {
         date = new Date(timestamp);
     } else if (typeof timestamp === 'object') {
-        if (typeof timestamp.toDate === 'function') {
-            date = timestamp.toDate();
-        } else if ('seconds' in timestamp) {
-            date = new Date(timestamp.seconds * 1000);
-        } else if ('_seconds' in timestamp) {
-            date = new Date(timestamp._seconds * 1000);
+        const tsObj = timestamp as FirestoreTimestamp;
+        if (typeof tsObj.toDate === 'function') {
+            date = tsObj.toDate();
+        } else if ('seconds' in tsObj && typeof tsObj.seconds === 'number') {
+            date = new Date(tsObj.seconds * 1000);
+        } else if ('_seconds' in tsObj && typeof tsObj._seconds === 'number') {
+            date = new Date(tsObj._seconds * 1000);
         } else {
             return 'N/A';
         }
@@ -34,7 +38,7 @@ export function formatTimestamp(timestamp: any): string {
     }).format(date);
 }
 
-export function formatDate(dateInput: any): string {
+export function formatDate(dateInput: DateInput): string {
     if (!dateInput) return 'N/A';
 
     let date: Date;
@@ -44,12 +48,13 @@ export function formatDate(dateInput: any): string {
     } else if (typeof dateInput === 'string' || typeof dateInput === 'number') {
         date = new Date(dateInput);
     } else if (typeof dateInput === 'object') {
-        if (typeof dateInput.toDate === 'function') {
-            date = dateInput.toDate();
-        } else if ('seconds' in dateInput) {
-            date = new Date(dateInput.seconds * 1000);
-        } else if ('_seconds' in dateInput) {
-            date = new Date(dateInput._seconds * 1000);
+        const tsObj = dateInput as FirestoreTimestamp;
+        if (typeof tsObj.toDate === 'function') {
+            date = tsObj.toDate();
+        } else if ('seconds' in tsObj && typeof tsObj.seconds === 'number') {
+            date = new Date(tsObj.seconds * 1000);
+        } else if ('_seconds' in tsObj && typeof tsObj._seconds === 'number') {
+            date = new Date(tsObj._seconds * 1000);
         } else {
             return 'N/A';
         }
