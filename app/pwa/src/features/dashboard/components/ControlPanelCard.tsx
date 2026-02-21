@@ -46,8 +46,12 @@ export function ControlPanelCard() {
             } else {
                 toast.info("Automation paused.");
             }
-        } catch (error: any) {
-            toast.error(error.message || "Failed to toggle automation");
+        } catch (error: unknown) {
+            if (error instanceof Error) {
+                toast.error(error.message || "Failed to toggle automation");
+            } else {
+                toast.error("Failed to toggle automation");
+            }
         } finally {
             setIsToggling(false);
         }
@@ -59,8 +63,12 @@ export function ControlPanelCard() {
             const refresh = httpsCallable(functions, "refresh_balance");
             await refresh();
             toast.success("Wallet balance refreshed from Betfair.");
-        } catch (error: any) {
-            toast.error(error.message || "Failed to refresh balance");
+        } catch (error: unknown) {
+            if (error instanceof Error) {
+                toast.error(error.message || "Failed to refresh balance");
+            } else {
+                toast.error("Failed to refresh balance");
+            }
         } finally {
             setIsRefreshing(false);
         }
