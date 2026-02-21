@@ -448,7 +448,7 @@ def place_bet(req: https_fn.Request) -> https_fn.Response:
         return make_error_response(str(e))
 
 
-@https_fn.on_request(timeout_sec=60, memory=options.MemoryOption.MB_256)
+@https_fn.on_request(timeout_sec=60, memory=options.MemoryOption.MB_256, cors=cors_options)
 def refresh_balance(req: https_fn.Request) -> https_fn.Response:
     """Force sync the wallet balance with Betfair and update Firestore."""
     try:
