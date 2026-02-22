@@ -67,7 +67,7 @@ def automated_daily_betting(event: scheduler_fn.ScheduledEvent) -> None:
 
 
 @scheduler_fn.on_schedule(
-    schedule='55 * * * *',
+    schedule='45 * * * *',
     memory=MemoryOption.GB_1,
     timeout_sec=300
 )
