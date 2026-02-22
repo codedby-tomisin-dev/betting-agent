@@ -14,7 +14,7 @@ export function BetWagerTotals({ wager }: BetWagerTotalsProps) {
             </div>
             <div className="flex justify-between items-center mb-2">
                 <span className="font-semibold">Combined Odds</span>
-                <span className="font-bold">{wager.odds.toFixed(2)}</span>
+                <span className="font-bold">{wager.odds?.toFixed(2) || '-'}</span>
             </div>
             <div className="flex justify-between items-center">
                 <span className="font-semibold text-green-700">Potential Returns</span>

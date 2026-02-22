@@ -14,7 +14,7 @@ export function BetSelectionItemView({ selection }: BetSelectionItemViewProps) {
                 <div className="flex-1">
                     <p className="font-medium text-sm">{selection.market}</p>
                     <p className="text-xs text-gray-500 mt-1">
-                        Odds: <span className="font-semibold">{selection.odds.toFixed(2)}</span>
+                        Odds: <span className="font-semibold">{selection.odds?.toFixed(2) || '-'}</span>
                         {" • "}
                         Stake: <span className="font-semibold">{formatCurrency(selection.stake)}</span>
                         {" • "}

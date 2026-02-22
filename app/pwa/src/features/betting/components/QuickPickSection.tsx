@@ -129,7 +129,7 @@ export function QuickPickSection({ event, markets, onSelection, isInSlip }: Quic
                     disabled={!homeWin}
                 >
                     <span className="text-xs font-bold text-gray-700 mb-1 truncate w-full text-center">{teams.home}</span>
-                    <span className="text-2xl font-bold text-gray-900 mb-1">{homeWin?.odds.toFixed(2) || '-'}</span>
+                    <span className="text-2xl font-bold text-gray-900 mb-1">{homeWin?.odds?.toFixed(2) || '-'}</span>
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">WIN</span>
 
                     {isSelected(matchOddsMarket?.market_id, homeWin?.selection_id) && (
@@ -151,7 +151,7 @@ export function QuickPickSection({ event, markets, onSelection, isInSlip }: Quic
                     disabled={!draw}
                 >
                     <span className="text-xs font-bold text-gray-700 mb-1">Draw</span>
-                    <span className="text-2xl font-bold text-gray-900 mb-1">{draw?.odds.toFixed(2) || '-'}</span>
+                    <span className="text-2xl font-bold text-gray-900 mb-1">{draw?.odds?.toFixed(2) || '-'}</span>
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">TIE</span>
                     {isSelected(matchOddsMarket?.market_id, draw?.selection_id) && (
                         <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-pink-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-sm">
@@ -172,7 +172,7 @@ export function QuickPickSection({ event, markets, onSelection, isInSlip }: Quic
                     disabled={!awayWin}
                 >
                     <span className="text-xs font-bold text-gray-700 mb-1 truncate w-full text-center">{teams.away}</span>
-                    <span className="text-2xl font-bold text-gray-900 mb-1">{awayWin?.odds.toFixed(2) || '-'}</span>
+                    <span className="text-2xl font-bold text-gray-900 mb-1">{awayWin?.odds?.toFixed(2) || '-'}</span>
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">WIN</span>
                     {isSelected(matchOddsMarket?.market_id, awayWin?.selection_id) && (
                         <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-pink-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-sm">
@@ -196,7 +196,7 @@ export function QuickPickSection({ event, markets, onSelection, isInSlip }: Quic
                     disabled={!homeOrDraw}
                 >
                     <span className="text-[10px] font-bold text-gray-700 mb-1">Home or Draw</span>
-                    <span className="text-xs font-bold text-gray-900">{homeOrDraw?.odds.toFixed(2) || '-'}</span>
+                    <span className="text-xs font-bold text-gray-900">{homeOrDraw?.odds?.toFixed(2) || '-'}</span>
                 </button>
 
                 {/* Home or Away */}
@@ -211,7 +211,7 @@ export function QuickPickSection({ event, markets, onSelection, isInSlip }: Quic
                     disabled={!homeOrAway}
                 >
                     <span className="text-[10px] font-bold text-gray-700 mb-1">Home or Away</span>
-                    <span className="text-xs font-bold text-gray-900">{homeOrAway?.odds.toFixed(2) || '-'}</span>
+                    <span className="text-xs font-bold text-gray-900">{homeOrAway?.odds?.toFixed(2) || '-'}</span>
                 </button>
 
                 {/* Away or Draw */}
@@ -226,7 +226,7 @@ export function QuickPickSection({ event, markets, onSelection, isInSlip }: Quic
                     disabled={!awayOrDraw}
                 >
                     <span className="text-[10px] font-bold text-gray-700 mb-1">Away or Draw</span>
-                    <span className="text-xs font-bold text-gray-900">{awayOrDraw?.odds.toFixed(2) || '-'}</span>
+                    <span className="text-xs font-bold text-gray-900">{awayOrDraw?.odds?.toFixed(2) || '-'}</span>
                 </button>
             </div>
 
@@ -338,7 +338,7 @@ export function QuickPickSection({ event, markets, onSelection, isInSlip }: Quic
                                             ? "bg-pink-500 text-white group-hover:bg-pink-600"
                                             : "bg-gray-200 text-gray-700 group-hover:bg-gray-300"
                                     )}>
-                                        {suggestion.selection.odds.toFixed(2)}
+                                        {suggestion.selection.odds?.toFixed(2) || '-'}
                                     </span>
                                 </button>
                             ))}

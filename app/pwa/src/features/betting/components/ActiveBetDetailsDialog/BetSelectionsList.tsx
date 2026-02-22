@@ -30,7 +30,7 @@ export function BetSelectionsList({ groupedByEvent }: BetSelectionsListProps) {
                                         <div className="flex-1">
                                             <p className="font-medium text-sm text-gray-900">{selection.market}</p>
                                             <p className="text-xs text-gray-500 mt-0.5">
-                                                Odds: <span className="font-semibold text-gray-700">{selection.odds.toFixed(2)}</span>
+                                                Odds: <span className="font-semibold text-gray-700">{selection.odds?.toFixed(2) || '-'}</span>
                                                 {" • "}
                                                 Stake: <span className="font-semibold text-gray-700">{formatCurrency(selection.stake)}</span>
                                                 {" • "}
