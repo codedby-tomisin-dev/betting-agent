@@ -516,7 +516,7 @@ class BettingManager:
         # 1. Source Games (Next 1 Hour)
         try:
             now = datetime.now(timezone.utc)
-            one_hour_later = now + timedelta(hours=3)
+            one_hour_later = now + timedelta(minutes=75)
             
             from_time = now.strftime("%Y-%m-%dT%H:%M:%S.000Z")
             to_time = one_hour_later.strftime("%Y-%m-%dT%H:%M:%S.000Z")
