@@ -61,13 +61,19 @@ export function ControlPanelCard() {
         setIsRefreshing(true);
         try {
             const refresh = httpsCallable(functions, "refresh_balance");
-            await refresh();
-            toast.success("Wallet balance refreshed from Betfair.");
+            const checkBetResults = httpsCallable(functions, "check_bet_results");
+
+            await Promise.all([
+                refresh(),
+                checkBetResults()
+            ]);
+
+            toast.success("Balance and bet results updated.");
         } catch (error: unknown) {
             if (error instanceof Error) {
-                toast.error(error.message || "Failed to refresh balance");
+                toast.error(error.message || "Failed to refresh");
             } else {
-                toast.error("Failed to refresh balance");
+                toast.error("Failed to refresh");
             }
         } finally {
             setIsRefreshing(false);
@@ -99,7 +105,7 @@ export function ControlPanelCard() {
                     </span>
                 </div>
 
-                {/* Refresh Balance */}
+                {/* Refresh */}
                 <div className="flex flex-col items-center gap-3">
                     <Button
                         variant="ghost"
@@ -111,7 +117,7 @@ export function ControlPanelCard() {
                         <RefreshCw className={`h-6 w-6 ${isRefreshing ? "animate-spin" : ""}`} />
                     </Button>
                     <span className="text-base font-semibold text-slate-700">
-                        Refresh Balance
+                        Refresh
                     </span>
                 </div>
 
