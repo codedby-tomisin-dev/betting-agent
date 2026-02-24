@@ -3,6 +3,7 @@ import os
 BRAVE_SEARCH_API_KEY = os.getenv('BRAVE_SEARCH_API_KEY')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 OPEN_AI_API_KEY = os.getenv('OPEN_AI_API_KEY')
+FOOTBALL_DATA_API_KEY = os.getenv('FOOTBALL_DATA_API_KEY')
 
 # Automated betting configuration
 AUTOMATED_BETTING_OPTIONS = {

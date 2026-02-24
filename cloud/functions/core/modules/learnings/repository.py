@@ -1,4 +1,5 @@
 from typing import Optional, Dict, Any
+from google.cloud.firestore_v1.transforms import SERVER_TIMESTAMP
 from core.modules.shared.repository import BaseRepository
 from core import logger
 
@@ -29,6 +30,7 @@ class LearningsRepository(BaseRepository):
         try:
             update_data = {
                 "content": content,
+                "updated_at": SERVER_TIMESTAMP
             }
             # We use set with merge=True so it creates if it doesn't exist
             self.set(self.main_doc_id, update_data, merge=True)

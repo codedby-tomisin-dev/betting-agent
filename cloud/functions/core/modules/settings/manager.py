@@ -5,9 +5,9 @@ from core.modules.settings.models import BettingSettings
 
 class SettingsManager:
     """Manager for application settings"""
-    
-    def __init__(self):
-        self.repository = SettingsRepository()
+
+    def __init__(self, repository=None):
+        self.repository = repository or SettingsRepository()
         self.default_doc = "betting"
 
     def get_settings(self) -> Dict[str, Any]:

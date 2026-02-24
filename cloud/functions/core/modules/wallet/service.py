@@ -7,10 +7,9 @@ from core.modules.betting.betfair_service import BetfairService
 from core import logger
 
 class WalletService:
-    def __init__(self):
-        self.repo = WalletRepository()
-        # Initialize lazily when needed
-        self._betfair = None
+    def __init__(self, repository=None, betfair_service=None):
+        self.repo = repository or WalletRepository()
+        self._betfair = betfair_service
 
     @property
     def betfair(self) -> BetfairService:

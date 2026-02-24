@@ -34,23 +34,21 @@ def test_execute_automated_betting_creates_suggestion(betting_manager, sample_ev
     target_date = "2025-01-01"
 
     betting_manager.repo.get_matches_by_date.return_value = []
-    betting_manager.get_balance = MagicMock(return_value={"available_balance": 100})
 
     # sample_event uses new schema field 'time'
     sample_event_with_date = {**sample_event, "time": "2025-01-01T15:00:00Z"}
     betting_manager.get_odds = MagicMock(return_value=[sample_event_with_date])
 
     mock_suggestion = {"id": "new_suggestion_123", "status": "intent"}
+    betting_manager._suggestion_repo.create_suggestion.return_value = mock_suggestion
 
-    with patch('core.modules.betting.manager.SuggestionRepository') as MockSuggRepo:
-        MockSuggRepo.return_value.create_suggestion.return_value = mock_suggestion
-        result = betting_manager.execute_automated_betting(
-            competitions=["Test Comp"],
-            bankroll_percent=10,
-            max_bankroll=10,
-            risk_appetite=3,
-            target_date=target_date
-        )
+    result = betting_manager.execute_automated_betting(
+        competitions=["Test Comp"],
+        bankroll_percent=10,
+        max_bankroll=10,
+        risk_appetite=3,
+        target_date=target_date
+    )
 
     assert result["id"] == "new_suggestion_123"
 
@@ -58,26 +56,24 @@ def test_execute_automated_betting_creates_suggestion(betting_manager, sample_ev
 def test_intent_creation_structure(betting_manager, sample_event):
     """Test that balance is correctly structured in the created suggestion."""
     betting_manager.repo.get_matches_by_date.return_value = []
-    betting_manager.get_balance = MagicMock(return_value={"available_balance": 100})
 
     sample_event_with_date = {**sample_event, "time": "2025-01-01T15:00:00Z"}
     betting_manager.get_odds = MagicMock(return_value=[sample_event_with_date])
 
-    with patch('core.modules.betting.manager.SuggestionRepository') as MockSuggRepo:
-        mock_create = MockSuggRepo.return_value.create_suggestion
-        mock_create.return_value = {"id": "sug_123"}
+    betting_manager._suggestion_repo.create_suggestion.return_value = {"id": "sug_123"}
 
-        betting_manager.execute_automated_betting(
-            competitions=["Test Comp"],
-            bankroll_percent=10,
-            max_bankroll=10,
-            risk_appetite=3,
-            target_date="2025-01-01"
-        )
+    betting_manager.execute_automated_betting(
+        competitions=["Test Comp"],
+        bankroll_percent=10,
+        max_bankroll=10,
+        risk_appetite=3,
+        target_date="2025-01-01"
+    )
 
-        call_args = mock_create.call_args
-        assert call_args is not None
-        intent_data = call_args[0][0]
+    mock_create = betting_manager._suggestion_repo.create_suggestion
+    call_args = mock_create.call_args
+    assert call_args is not None
+    intent_data = call_args[0][0]
 
     assert "balance" in intent_data
     assert "starting" in intent_data["balance"]
@@ -96,8 +92,8 @@ def test_get_balance(betting_manager):
         "retained_commission": 0.0
     }
     
-    balance = betting_manager.get_balance()
-    
+    balance = betting_manager.betfair.get_balance()
+
     assert balance["available_balance"] == 100.0
     assert "exposure" in balance
 
@@ -152,34 +148,29 @@ def test_analyze_betting_opportunities(betting_manager, sample_event):
         min_profit=0.0
     )
     
-    # Mock the AI agent response
-    with patch('core.modules.betting.manager.betting_agent') as mock_agent:
-        # Create a mock recommendation object with proper attributes
-        mock_rec = Mock()
-        mock_rec.stake = 10.0
-        mock_rec.odds = 2.5
-        mock_rec.market_id = "1.123"
-        mock_rec.selection_id = 12345
-        mock_rec.pick = Mock(event_name="Test Event")
-        mock_rec.model_dump.return_value = {
-            "market_id": "1.123",
-            "selection_id": 12345,
-            "stake": 10.0,
-            "odds": 2.5
-        }
-        
-        mock_result = Mock()
-        mock_result.output = Mock()
-        mock_result.output.recommendations = [mock_rec]
-        mock_result.output.overall_reasoning = "Test overall reasoning"
-        
-        mock_agent.run_sync.return_value = mock_result
-        
+    # Build a realistic mock recommendation
+    mock_rec = Mock()
+    mock_rec.stake = 10.0
+    mock_rec.odds = 2.5
+    mock_rec.market_id = "1.123"
+    mock_rec.selection_id = 12345
+    mock_rec.side = "BACK"
+    mock_rec.reasoning = "Good pick"
+    mock_rec.stake_justification = None
+    mock_rec.pick = Mock(event_name="Manchester United vs Liverpool", option_name="Manchester United")
+
+    from core.modules.betting.models import BettingAgentResponse
+    mock_response = Mock(spec=BettingAgentResponse)
+    mock_response.recommendations = [mock_rec]
+    mock_response.overall_reasoning = "Test overall reasoning"
+
+    with patch('core.modules.betting.manager.gather_intelligence', return_value="mock intelligence"), \
+         patch('core.modules.betting.manager.make_bet_selections', return_value=mock_response):
         result = betting_manager.analyze_betting_opportunities(data)
-        
-        assert "selections" in result
-        assert "items" in result["selections"]
-        assert len(result["selections"]["items"]) > 0
+
+    assert "selections" in result
+    assert "items" in result["selections"]
+    assert len(result["selections"]["items"]) > 0
 
 
 def test_update_analysis_result(betting_manager):

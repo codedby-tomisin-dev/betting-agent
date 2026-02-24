@@ -19,9 +19,15 @@ Do NOT just append a log of this specific bet. You must wholesale rewrite the do
 If there are no new lessons to be learned (e.g. standard expected variance), you should still return the current document, perhaps with a minor note reinforcing an existing rule.
 
 ### Structure of the Learnings Document
-The document you write should follow a clear structure, for example:
-- **Core Principles**: Golden rules that have proven true over time.
-- **Common Pitfalls**: Mistakes the AI has made and should avoid.
-- **Market Specific Insights**: Observations about specific markets (e.g. "We tend to overestimate Corner Match Bets when the favorite is playing away").
+The document MUST read like a highly actionable **Decision Tree** or **If/Then Checklist** that the Betting Strategist AI can easily parse and execute.
+Avoid long paragraphs. Use structural elements like:
+- **IF [Condition] THEN [Action]**
+- Chronological steps (e.g., Step 1: Check X. Step 2: If X is true, look at Y).
+- Bullet points and bold text for key triggers.
+
+Group these decision trees logically, for instance by:
+- **General Filters**: When to skip a bet entirely.
+- **Match Contexts**: e.g., Favorites vs Underdogs, Derbies.
+- **Market Specifics**: Goal Markets, Corner Markets, Booking Points.
 
 Your output should be pure Markdown text meant to be saved directly to the database.

@@ -1,8 +1,5 @@
 import json
 import datetime
-from google.cloud.firestore_v1.transforms import Sentinel
-import datetime
-from google.cloud.firestore_v1.transforms import Sentinel
 from typing import Dict, Any
 from core import logger
 
@@ -14,8 +11,9 @@ from .models import LearningsAgentResponse
 class LearningsManager:
     """Manager for automated betting learnings and insights."""
 
-    def __init__(self, repository=None):
+    def __init__(self, repository=None, bet_repository=None):
         self.repo = repository or LearningsRepository()
+        self._bet_repo = bet_repository
 
     def get_current_learnings(self) -> str:
         """Retrieves the current learnings markdown."""
@@ -93,10 +91,12 @@ class LearningsManager:
         logger.info(f"Starting bulk learnings analysis for up to {limit} finished bets")
         
         try:
-            from core.modules.betting.repository import BetRepository
-            
+            if self._bet_repo is None:
+                from core.modules.betting.repository import BetRepository
+                self._bet_repo = BetRepository()
+
             # 1. Fetch finished bets
-            finished_bets = BetRepository().get_all_finished_bets(limit=limit)
+            finished_bets = self._bet_repo.get_all_finished_bets(limit=limit)
             
             if not finished_bets:
                 logger.info("No finished bets found to learn from.")
@@ -127,8 +127,12 @@ class LearningsManager:
                 def default(self, obj):
                     if isinstance(obj, datetime.datetime):
                         return obj.isoformat()
-                    if isinstance(obj, Sentinel):
-                        return str(obj)
+                    try:
+                        from google.cloud.firestore_v1.transforms import Sentinel
+                        if isinstance(obj, Sentinel):
+                            return str(obj)
+                    except ImportError:
+                        pass
                     return super().default(obj)
 
             # 4. Build prompt

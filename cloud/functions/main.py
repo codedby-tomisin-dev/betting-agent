@@ -12,13 +12,47 @@ from core import logger
 from core.migrations.migrate_bet_slips import run_migration, migrate_single_document
 from core.modules.betting.manager import BettingManager
 from core.modules.betting.models import AnalyzeBetsRequest, GetOddsRequest, PlaceBetRequest
-from typing import Any
 from core.modules.betting.repository import BetRepository
+from core.modules.betting.suggestion_repository import SuggestionRepository
+from core.modules.learnings.repository import LearningsRepository
+from core.modules.settings.repository import SettingsRepository
+from core.modules.wallet.repository import WalletRepository
+from typing import Any
 from core.modules.settings.manager import SettingsManager
+from core.modules.learnings.manager import LearningsManager
+from core.modules.wallet.service import WalletService
 from utils.responses import make_error_response, make_success_response
 from constants import RELIABLE_TEAMS, RELIABLE_COMPETITIONS, RELIABLE_ALL_TEAMS
 from core.modules.notifications import NotificationManager
-from core.modules.learnings.manager import LearningsManager
+
+
+def _make_settings_manager() -> SettingsManager:
+    return SettingsManager(repository=SettingsRepository())
+
+
+def _make_betting_manager() -> BettingManager:
+    bet_repo = BetRepository()
+    suggestion_repo = SuggestionRepository()
+    learnings_manager = LearningsManager(
+        repository=LearningsRepository(),
+        bet_repository=BetRepository(),
+    )
+    wallet_service = WalletService(repository=WalletRepository())
+    settings_manager = _make_settings_manager()
+    return BettingManager(
+        bet_repo=bet_repo,
+        suggestion_repo=suggestion_repo,
+        learnings_manager=learnings_manager,
+        wallet_service=wallet_service,
+        settings_manager=settings_manager,
+    )
+
+
+def _make_learnings_manager() -> LearningsManager:
+    return LearningsManager(
+        repository=LearningsRepository(),
+        bet_repository=BetRepository(),
+    )
 
 
 # For cost control, you can set the maximum number of containers that can be
@@ -48,13 +82,13 @@ def automated_daily_betting(event: scheduler_fn.ScheduledEvent) -> None:
     """
     try:
         logger.info("Automated daily betting scheduler triggered")
-        settings = SettingsManager().get_betting_settings()
+        settings = _make_settings_manager().get_betting_settings()
         
         if not settings.automation_enabled:
             logger.info("Automation is disabled in settings. Skipping execution.")
             return
 
-        result = BettingManager().execute_automated_betting(
+        result = _make_betting_manager().execute_automated_betting(
             competitions=RELIABLE_COMPETITIONS,
             bankroll_percent=settings.bankroll_percent,
             max_bankroll=settings.max_bankroll,
@@ -78,13 +112,13 @@ def hourly_automated_betting(event: scheduler_fn.ScheduledEvent) -> None:
     """
     try:
         logger.info("Hourly automated betting scheduler triggered")
-        settings = SettingsManager().get_betting_settings()
+        settings = _make_settings_manager().get_betting_settings()
         
         if not settings.automation_enabled:
             logger.info("Automation is disabled in settings. Skipping execution.")
             return
 
-        result = BettingManager().execute_hourly_automated_betting(
+        result = _make_betting_manager().execute_hourly_automated_betting(
             bankroll_percent=settings.bankroll_percent,
             max_bankroll=settings.max_bankroll,
             risk_appetite=settings.risk_appetite,
@@ -106,8 +140,8 @@ def hourly_automated_betting_http(req: https_fn.Request) -> https_fn.Response:
     """
     try:
         logger.info("Hourly automated betting HTTP endpoint triggered")
-        settings = SettingsManager().get_betting_settings()
-        result = BettingManager().execute_hourly_automated_betting(
+        settings = _make_settings_manager().get_betting_settings()
+        result = _make_betting_manager().execute_hourly_automated_betting(
             bankroll_percent=settings.bankroll_percent,
             max_bankroll=settings.max_bankroll,
             risk_appetite=settings.risk_appetite,
@@ -130,7 +164,7 @@ def automated_suggestion_promotion(event: scheduler_fn.ScheduledEvent) -> None:
     """
     try:
         logger.info("Automated suggestion promotion scheduler triggered")
-        manager = BettingManager()
+        manager = _make_betting_manager()
         result = manager.promote_suggestions_to_bets()
         logger.info(f"Suggestion promotion result: {result}")
     except Exception as e:
@@ -151,8 +185,8 @@ def automated_daily_betting_http(req: https_fn.Request) -> https_fn.Response:
     try:
         logger.info("Automated daily betting HTTP endpoint triggered")
         target_date = req.args.get('date', None)
-        settings = SettingsManager().get_betting_settings()
-        result = BettingManager().execute_automated_betting(
+        settings = _make_settings_manager().get_betting_settings()
+        result = _make_betting_manager().execute_automated_betting(
             competitions=RELIABLE_COMPETITIONS,
             bankroll_percent=settings.bankroll_percent,
             max_bankroll=settings.max_bankroll,
@@ -188,7 +222,7 @@ def approve_bet_intent(req: https_fn.Request) -> https_fn.Response:
         return make_error_response("bet_id is required", status=400)
 
     try:
-        manager = BettingManager()
+        manager = _make_betting_manager()
         manager.approve_bet_intent(bet_id, selections)
         return make_success_response({"status": "approved", "bet_id": bet_id})
     except Exception as e:
@@ -220,7 +254,7 @@ def analyze_bet_intent(event: firestore_fn.Event[firestore_fn.DocumentSnapshot])
         budget = preferences.get("budget", 10.0)
         risk_appetite = preferences.get("risk_appetite", 3.0)
         
-        settings = SettingsManager().get_betting_settings()
+        settings = _make_settings_manager().get_betting_settings()
         min_profit = preferences.get("min_profit", settings.min_profit)
         
         # Create AnalyzeBetsRequest object
@@ -231,7 +265,7 @@ def analyze_bet_intent(event: firestore_fn.Event[firestore_fn.DocumentSnapshot])
             min_profit=min_profit
         )
         
-        manager = BettingManager()
+        manager = _make_betting_manager()
         recommendations = manager.analyze_betting_opportunities(analysis_request)
         manager.update_analysis_result(bet_id, recommendations)
 
@@ -240,7 +274,7 @@ def analyze_bet_intent(event: firestore_fn.Event[firestore_fn.DocumentSnapshot])
     except Exception as e:
         logger.error(f"Error analyzing bet intent {event.params['betId']}: {e}", exc_info=True)
         try:
-            manager = BettingManager()
+            manager = _make_betting_manager()
             manager.mark_bet_failed(event.params['betId'], str(e))
         except:
             pass
@@ -271,7 +305,7 @@ def analyze_suggestion(event: firestore_fn.Event[firestore_fn.DocumentSnapshot])
         budget = preferences.get("budget", 10.0)
         risk_appetite = preferences.get("risk_appetite", 3.0)
         
-        settings = SettingsManager().get_betting_settings()
+        settings = _make_settings_manager().get_betting_settings()
         min_profit = preferences.get("min_profit", settings.min_profit)
         
         # Create AnalyzeBetsRequest object
@@ -282,7 +316,7 @@ def analyze_suggestion(event: firestore_fn.Event[firestore_fn.DocumentSnapshot])
             min_profit=min_profit
         )
         
-        manager = BettingManager()
+        manager = _make_betting_manager()
         recommendations = manager.analyze_betting_opportunities(analysis_request)
         manager.update_suggestion_analysis(suggestion_id, recommendations)
 
@@ -340,7 +374,7 @@ def place_bet_on_ready(event: firestore_fn.Event[firestore_fn.Change[firestore_f
             transaction_data = proceed_with_placement(transaction, doc_ref)
             
             if transaction_data:
-                manager = BettingManager()
+                manager = _make_betting_manager()
                 manager.prepare_and_place_bets_from_ready_doc(bet_id, transaction_data)
                 logger.info(f"Bets placed for {bet_id}")
             else:
@@ -349,7 +383,7 @@ def place_bet_on_ready(event: firestore_fn.Event[firestore_fn.Change[firestore_f
     except Exception as e:
         logger.error(f"Error placing bets for {event.params['betId']}: {e}", exc_info=True)
         try:
-            BettingManager().mark_bet_failed(event.params['betId'], f"Placement failed: {str(e)}")
+            _make_betting_manager().mark_bet_failed(event.params['betId'], f"Placement failed: {str(e)}")
         except:
             pass
 
@@ -373,7 +407,7 @@ def get_odds(req: https_fn.Request) -> https_fn.Response:
             query=req.args.get('query')
         )
         
-        result = BettingManager().get_odds(request=request_data)
+        result = _make_betting_manager().get_odds(request=request_data)
         return make_success_response(data=result)
     except Exception as e:
         logger.error(f"Get odds error: {e}")
@@ -438,7 +472,7 @@ def place_bet(req: https_fn.Request) -> https_fn.Response:
                 status=400
             )
         
-        result = BettingManager().create_and_place_bet(request=request_data)
+        result = _make_betting_manager().create_and_place_bet(request=request_data)
         return make_success_response(result)
     except ValidationError as e:
         logger.error(f"Place bet validation error: {e}")
@@ -452,8 +486,7 @@ def place_bet(req: https_fn.Request) -> https_fn.Response:
 def refresh_balance(req: https_fn.Request) -> https_fn.Response:
     """Force sync the wallet balance with Betfair and update Firestore."""
     try:
-        from core.modules.wallet.service import WalletService
-        wallet = WalletService().sync_balance()
+        wallet = WalletService(repository=WalletRepository()).sync_balance()
         if wallet:
             return make_success_response({"status": "success", "balance": wallet.amount, "currency": wallet.currency})
         else:
@@ -494,16 +527,23 @@ def analyze_bets(req: https_fn.Request) -> https_fn.Response:
     
     data = req.get_json()
 
-    settings_manager = SettingsManager()
+    settings_manager = _make_settings_manager()
 
     data.setdefault('risk_appetite', settings_manager.get_setting('RISK_APPETITE', 3))
+    
+    try:
+        current_risk = float(data['risk_appetite'])
+        data['risk_appetite'] = max(1.0, min(5.0, current_risk))
+    except (ValueError, TypeError):
+        data['risk_appetite'] = 3.0
+        
     data.setdefault('budget', settings_manager.get_setting('BUDGET', settings_manager.get_setting('DEFAULT_BUDGET', 100)))
     data.setdefault('min_profit', settings_manager.get_setting('MIN_PROFIT', 0.0))
 
     analysis_request = AnalyzeBetsRequest(**data)
     
     try:
-        result = BettingManager().analyze_betting_opportunities(analysis_request)
+        result = _make_betting_manager().analyze_betting_opportunities(analysis_request)
         return make_success_response(result)
     except Exception as e:
         logger.error(f"Betting agent error: {e}")
@@ -521,7 +561,7 @@ def get_bet(req: https_fn.Request) -> https_fn.Response:
         if not bet_id:
             return make_error_response("id is required", status=400)
             
-        result = BettingManager().get_bet(bet_id)
+        result = _make_betting_manager().get_bet(bet_id)
         if not result:
             return make_error_response("Bet not found", status=404)
             
@@ -537,7 +577,7 @@ def check_bet_results(req: https_fn.Request) -> https_fn.Response:
     Check status of placed bets and update repository.
     """
     try:
-        result = BettingManager().check_bet_results()
+        result = _make_betting_manager().check_bet_results()
         return make_success_response(result)
     except Exception as e:
         logger.error(f"Check bet results error: {e}", exc_info=True)
@@ -551,7 +591,7 @@ def automated_check_bet_results(event: scheduler_fn.ScheduledEvent) -> None:
     """
     try:
         logger.info("Automated bet results check triggered")
-        manager = BettingManager()
+        manager = _make_betting_manager()
         manager.check_bet_results()
         logger.info("Automated bet results check completed")
     except Exception as e:
@@ -569,7 +609,7 @@ def save_settings(req: https_fn.CallableRequest) -> Any:
         if not settings:
              raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT, message="Settings data is required")
 
-        manager = SettingsManager()
+        manager = _make_settings_manager()
         result = manager.save_settings(settings)
         return {"status": "success", "settings": result}
     except Exception as e:
@@ -584,7 +624,7 @@ def get_upcoming_games(req: https_fn.CallableRequest) -> Any:
     Get all upcoming games based on user settings.
     Optional query parameter 'date' (YYYY-MM-DD) to filter by specific date.
     """
-    manager = BettingManager()
+    manager = _make_betting_manager()
     result = []
     
     try:
@@ -625,7 +665,7 @@ def get_bet_history(req: https_fn.CallableRequest) -> Any:
         status = data.get("status")
         date_range = data.get("date_range")
         
-        manager = BettingManager()
+        manager = _make_betting_manager()
         return manager.get_bet_history(limit, start_after_id, status, date_range)
     except Exception as e:
         logger.error(f"Error fetching bet history: {e}", exc_info=True)
@@ -698,7 +738,7 @@ def analyze_finished_hourly_bet(event: firestore_fn.Event[firestore_fn.Change[fi
 
         logger.info(f"Hourly automated bet {bet_id} finished. Passing to Learnings Agent.")
         
-        manager = LearningsManager()
+        manager = _make_learnings_manager()
         manager.analyze_finished_bet(after_data)
 
     except Exception as e:
@@ -712,12 +752,10 @@ def learn_from_all_bets(req: https_fn.Request) -> https_fn.Response:
     on all currently finished bets in parallel.
     """
     try:
-        from core.modules.learnings.manager import LearningsManager
-        
         # We can extract a limit parameter from data if provided, else default to 100
         limit = req.data.get("limit", 100) if isinstance(req.data, dict) else 100
-        
-        manager = LearningsManager()
+
+        manager = _make_learnings_manager()
         count = manager.analyze_all_finished_bets(limit=limit)
         
         return make_success_response({
@@ -729,13 +767,12 @@ def learn_from_all_bets(req: https_fn.Request) -> https_fn.Response:
         return make_error_response(str(e), as_dict=True)
 
 
-
 @https_fn.on_request(cors=cors_options)
 def test_learnings_http(req: https_fn.Request) -> https_fn.Response:
     """Manual trigger to test LearningsManager via HTTP."""
     try:
         data = req.get_json() if req.is_json else {}
-        manager = LearningsManager()
+        manager = _make_learnings_manager()
         manager.analyze_finished_bet(data)
         return make_success_response({"status": "success"})
     except Exception as e:
