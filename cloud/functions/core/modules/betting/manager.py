@@ -6,8 +6,10 @@ import uuid
 from pydantic import ValidationError
 
 from core import logger
-from core.firestore import admin_firestore
+from core.timestamps import server_timestamp
 from core.modules.betting.agent import betting_agent
+from core.modules.betting.agent.service import make_bet_selections
+from core.modules.betting.sourcing.service import gather_intelligence
 from core.modules.betting.models import AnalyzeBetsRequest, BettingAgentResponse, GetOddsRequest, PlaceBetRequest
 from core.modules.betting.repository import BetRepository
 from core.modules.betting.suggestion_repository import SuggestionRepository
@@ -22,10 +24,21 @@ from core.modules.wallet.service import WalletService
 class BettingManager:
     """Manager for betting analysis and recommendations"""
 
-    def __init__(self, betfair_service=None, bet_repo=None, settings_manager=None):
+    def __init__(
+        self,
+        betfair_service=None,
+        bet_repo=None,
+        settings_manager=None,
+        suggestion_repo=None,
+        learnings_manager=None,
+        wallet_service=None,
+    ):
         self.betfair = betfair_service or BetfairService()
         self.repo = bet_repo or BetRepository()
         self.settings_manager = settings_manager or SettingsManager()
+        self._suggestion_repo = suggestion_repo
+        self._learnings_manager = learnings_manager
+        self._wallet_service = wallet_service
 
     @staticmethod
     def _build_analysis_update(existing_doc: dict, analysis_result: dict) -> dict:
@@ -37,7 +50,7 @@ class BettingManager:
         combined_odds = total_returns / total_stake if total_stake > 0 else 1.0
         return {
             "status": "analyzed",
-            "analyzed_at": admin_firestore.SERVER_TIMESTAMP,
+            "analyzed_at": server_timestamp(),
             "selections": {
                 **analysis_result.get("selections", {}),
                 "wager": {
@@ -57,6 +70,18 @@ class BettingManager:
     def _calculate_budget(available_balance: float, bankroll_percent: float, max_bankroll: float) -> float:
         """Calculate betting budget as a capped percentage of available balance."""
         return min(available_balance * (bankroll_percent / 100), max_bankroll)
+
+    def get_suggestion_repo(self) -> SuggestionRepository:
+        """Return the injected SuggestionRepository, or create a default one lazily."""
+        if self._suggestion_repo is None:
+            self._suggestion_repo = SuggestionRepository()
+        return self._suggestion_repo
+
+    def get_learnings_manager(self) -> LearningsManager:
+        """Return the injected LearningsManager, or create a default one lazily."""
+        if self._learnings_manager is None:
+            self._learnings_manager = LearningsManager()
+        return self._learnings_manager
 
     def _is_valid_bet(self, stake: float, odds: float) -> bool:
         """Return True if a bet meets the minimum stake and profit requirements from user settings."""
@@ -118,78 +143,136 @@ class BettingManager:
             logger.error(f"Failed to parse events: {e}")
             raise ValueError(f"Invalid event data: {str(e)}")
         
-        requests_prompt = []
-        for event in events:
-            # Format single event string
-            event_details = f"Event: {event.event_name} ({event.competition_name}) - {event.event_time}\n"
-            for option in event.options:
-                event_details += f"  Market: {option.name} (ID: {option.market_id})\n"
-                for selection in option.options:
-                    event_details += f"    - Selection: {selection.name}, Odds: {selection.odds}, ID: {selection.selection_id}\n"
-            requests_prompt.append(event_details)
-        
-        all_events_str = "\n".join(requests_prompt)
-
-        risk_level = round(request.risk_appetite)
-
         # Get the centralized learnings
         try:
-            learnings_manager = LearningsManager()
-            learnings_markdown = learnings_manager.get_current_learnings()
+            learnings_markdown = self.get_learnings_manager().get_current_learnings()
         except Exception as e:
             logger.error(f"Failed to fetch learnings: {e}")
             learnings_markdown = ""
             
         learnings_section = f"\n\n    === HISTORICAL LEARNINGS ===\n    {learnings_markdown}\n    (Use these learnings to avoid past mistakes and validate your reasoning)" if learnings_markdown else ""
 
-        # Build prompt for ALL events
-        prompt = f"""Analyze these betting opportunities and provide exactly 3 best betting recommendations based on the risk appetite and budget provided.
+        from constants import RELIABLE_ALL_TEAMS, RELIABLE_COMPETITIONS
+        import random
 
-        Events:
-        {all_events_str}
-
-        CRITICAL REQUIREMENTS:
-        1. Select exactly 3 bets that offer the best value across ALL events provided.
-        2. The total stake of all 3 bets MUST NOT exceed ${request.budget:.2f}.
-        3. Allocate the budget wisely among the 3 bets based on confidence and value.
-        4. Each selection MUST generate a profit of AT LEAST ${request.min_profit:.2f} (Profit = Stake * (Odds - 1)).
-        5. **IMPORTANT**: You MUST use the EXACT event names, market names, and selection names as provided above. 
-           Do NOT modify them in any way (e.g., do not change "v" to "vs", do not add/remove spaces, do not change capitalization).
-           The names must match EXACTLY as they appear in the data above.
-        {learnings_section}
-
-        USER PREFERENCES (STRICTLY ADHERE TO THESE):
-        - Risk Appetite: {request.risk_appetite}/5.0 -> Use Risk Level {risk_level} from your Handbook.
-        - Budget: ${request.budget:.2f} (This is the TOTAL budget for all 3 bets combined)
-        - Minimum Profit Per Selection: ${request.min_profit:.2f}
-
-        Use web search to research recent team form, head-to-head records, any relevant recent news. Provide a list of recommended bets that offer good value while strictly respecting the budget constraint and minimum profit requirements."""
-
-
-        logger.info(f"Analyzing {len(events)} events with total budget ${request.budget:.2f}")
+        reliable_events = []
+        fallback_recommendations = []
         
+        for event in events:
+            is_reliable = (
+                event.competition_name in RELIABLE_COMPETITIONS or
+                any(team in event.event_name for team in RELIABLE_ALL_TEAMS)
+            )
+            if is_reliable:
+                reliable_events.append(event)
+            else:
+                logger.info(f"Event {event.event_name} not in reliable teams/competitions. Applying scripted fallback.")
+                
+                # Desired options for fallback
+                fallback_targets = [
+                    ("OVER_UNDER_05", "Over 0.5 Goals"),
+                    ("OVER_UNDER_55", "Under 5.5 Goals"),
+                    ("OVER_UNDER_65", "Under 6.5 Goals")
+                ]
+                # Shuffle so we pick a different one if multiple are available
+                random.shuffle(fallback_targets)
+                
+                selected_option = None
+                selected_market_id = None
+                
+                # Find the first available fallback option
+                for market_name, option_name in fallback_targets:
+                    for market in event.options:
+                        if market.name == market_name:
+                            for opt in market.options:
+                                if opt.name == option_name:
+                                    selected_option = opt
+                                    selected_market_id = market.market_id
+                                    break
+                        if selected_option:
+                            break
+                    if selected_option:
+                        break
+                        
+                if selected_option:
+                    import math
+                    # Very simple staking rule for fallbacks: 
+                    # Aim for the minimum profit plus a tiny margin to safely pass _is_valid_bet checks
+                    stake = (request.min_profit + 0.1) / (selected_option.odds - 1) if selected_option.odds > 1.0 else 0
+                    
+                    # Round up to the nearest dollar to confidently pass validation
+                    stake = math.ceil(stake) 
+                    
+                    # Cap at total budget. Extremely short odds may require full budget.
+                    stake = min(stake, request.budget)
+                    stake = max(stake, 1.0) # At least $1
+                    
+                    if getattr(self, '_is_valid_bet', None):
+                        if not self._is_valid_bet(stake, selected_option.odds):
+                            logger.info(f"Fallback {selected_option.name} @ {selected_option.odds} skipped: stake {stake:.2f} failed validation.")
+                            continue # Skip if it doesn't meet minimum requirements
+
+                    # We import the model here for the fallback injection
+                    from core.modules.betting.models import BettingAgentResponse
+                    
+                    fallback_rec = BettingAgentResponse.BetRecommendation(
+                        pick=BettingAgentResponse.BetRecommendation.Pick(
+                            event_name=event.event_name,
+                            market_name=market.name,
+                            option_name=selected_option.name
+                        ),
+                        market_id=selected_market_id,
+                        selection_id=selected_option.selection_id,
+                        stake=round(stake, 2),
+                        odds=selected_option.odds,
+                        side="BACK",
+                        reasoning="Scripted fallback: Low-information match in unrecognized league. Structurally safe goal ceiling chosen.",
+                        confidence_rating=3,
+                        stake_justification=f"Minimum profit requirement dictated a ${stake:.2f} stake."
+                    )
+                    fallback_recommendations.append(fallback_rec)
+
+        logger.info(f"Analyzing {len(reliable_events)} events with AI, generated {len(fallback_recommendations)} fallback recommendations.")
+
+        # --- Step 1: Source intelligence for all reliable events ---
+        if reliable_events:
+            intelligence_section = gather_intelligence(reliable_events)
+        else:
+            intelligence_section = ""
+
+        # --- Step 2: Build and run the decision agent ---
         all_recommendations = []
         overall_reasoning = ""
 
-        try:
-            result = betting_agent.run_sync(prompt)
-            response_data: BettingAgentResponse = result.output
-            
-            overall_reasoning = response_data.overall_reasoning
-            
-            for rec in response_data.recommendations:
-                if self._is_valid_bet(rec.stake, rec.odds):
-                    all_recommendations.append(rec)
-                else:
-                    potential_profit = rec.stake * (rec.odds - 1)
-                    logger.warning(
-                        f"Skipping recommendation - stake: {rec.stake}, "
-                        f"profit: {potential_profit:.3f} - {rec.pick.event_name}"
-                    )
-            
-        except Exception as e:
-            logger.error(f"Error analyzing events: {e}")
-            overall_reasoning = f"Failed to analyze events - {str(e)}"
+        if reliable_events:
+            try:
+                response_data: BettingAgentResponse = make_bet_selections(
+                    events=reliable_events,
+                    intelligence_section=intelligence_section,
+                    budget=request.budget,
+                    min_profit=request.min_profit,
+                    risk_appetite=request.risk_appetite,
+                    learnings_section=learnings_section,
+                )
+                
+                overall_reasoning = response_data.overall_reasoning
+                
+                for rec in response_data.recommendations:
+                    if self._is_valid_bet(rec.stake, rec.odds):
+                        all_recommendations.append(rec)
+                    else:
+                        potential_profit = rec.stake * (rec.odds - 1)
+                        logger.warning(
+                            f"Skipping recommendation - stake: {rec.stake}, "
+                            f"profit: {potential_profit:.3f} - {rec.pick.event_name}"
+                        )
+                
+            except Exception as e:
+                logger.error(f"Error analyzing events: {e}")
+                overall_reasoning = f"Failed to analyze events - {str(e)}"
+        
+        # Combine AI recommendations with our fallback recommendations
+        all_recommendations.extend(fallback_recommendations)
 
         # Aggregate results (recommendations are already filtered)
         total_stake = sum(rec.stake for rec in all_recommendations)
@@ -243,7 +326,8 @@ class BettingManager:
                 "market_id": rec.market_id,
                 "selection_id": rec.selection_id,
                 "side": rec.side,
-                "reasoning": rec.reasoning
+                "reasoning": rec.reasoning,
+                "stake_justification": getattr(rec, 'stake_justification', None)
             })
         
         return {
@@ -317,8 +401,10 @@ class BettingManager:
         return result
     
     def get_wallet_service(self) -> WalletService:
-        """Helper to lazily instantiate WalletService to avoid circular loops."""
-        return WalletService()
+        """Return the injected WalletService, or create a default one lazily."""
+        if self._wallet_service is None:
+            self._wallet_service = WalletService()
+        return self._wallet_service
     
     def execute_automated_betting(
         self, 
@@ -476,10 +562,8 @@ class BettingManager:
             }
             
             # Use SuggestionRepository to create an initial suggestion
-            # This replaces direcr bet intent creation
-            suggestion_repo = SuggestionRepository()
-            
-            return suggestion_repo.create_suggestion(intent_data)
+            # This replaces direct bet intent creation
+            return self.get_suggestion_repo().create_suggestion(intent_data)
             
         except Exception as e:
             logger.error(f"Failed to create bet intent: {e}")
@@ -588,8 +672,8 @@ class BettingManager:
             bet_data = {
                 "target_date": now.date().isoformat(),
                 "status": "ready", # Auto-ready for placement
-                "created_at": admin_firestore.SERVER_TIMESTAMP,
-                "approved_at": admin_firestore.SERVER_TIMESTAMP, # Auto-approved
+                "created_at": server_timestamp(),
+                "approved_at": server_timestamp(), # Auto-approved
                 "source": "hourly_automated",
                 "preferences": {
                     "risk_appetite": risk_appetite,
@@ -631,8 +715,8 @@ class BettingManager:
         Runs daily.
         """
         logger.info("Promoting suggestions to bet slips...")
-        suggestion_repo = SuggestionRepository()
-        
+        suggestion_repo = self.get_suggestion_repo()
+
         # Get today's date
         target_date_str = datetime.now(timezone.utc).date().isoformat()
         
@@ -684,7 +768,7 @@ class BettingManager:
 
     def update_suggestion_analysis(self, suggestion_id: str, analysis_result: Dict[str, Any]) -> None:
         """Updates a suggestion document with analysis results."""
-        suggestion_repo = SuggestionRepository()
+        suggestion_repo = self.get_suggestion_repo()
         suggestion = suggestion_repo.get_suggestion(suggestion_id)
         if not suggestion:
             logger.error(f"Suggestion {suggestion_id} not found for update")
@@ -719,7 +803,7 @@ class BettingManager:
         """
         update_data = {
             "status": "ready",
-            "approved_at": admin_firestore.SERVER_TIMESTAMP,
+            "approved_at": server_timestamp(),
         }
 
         if selections is not None:
@@ -771,7 +855,7 @@ class BettingManager:
 
         update_data = {
             "status": doc_status,
-            "placed_at": admin_firestore.SERVER_TIMESTAMP,
+            "placed_at": server_timestamp(),
             "placement_results": placement_result,
         }
         
@@ -884,8 +968,8 @@ class BettingManager:
             intent_data = {
                 "target_date": datetime.now(timezone.utc).date().isoformat(),
                 "status": "ready", # Skip 'intent' and 'analyzed', go straight to ready
-                "created_at": admin_firestore.SERVER_TIMESTAMP,
-                "approved_at": admin_firestore.SERVER_TIMESTAMP,
+                "created_at": server_timestamp(),
+                "approved_at": server_timestamp(),
                 "source": "manual",
                 "preferences": {
                     "type": "manual_slip"
@@ -1036,7 +1120,7 @@ class BettingManager:
                     
                     update_data = {
                         "settlement_results": merged_results,
-                        "last_settled_at": admin_firestore.SERVER_TIMESTAMP,
+                        "last_settled_at": server_timestamp(),
                         "balance": {
                             **bet_doc.get("balance", {}),
                             "ending": starting_balance + total_realized_profit,
@@ -1045,7 +1129,7 @@ class BettingManager:
                     
                     if is_finished:
                         update_data["status"] = "finished"
-                        update_data["finished_at"] = admin_firestore.SERVER_TIMESTAMP
+                        update_data["finished_at"] = server_timestamp()
                         logger.info(f"Bet {bet_id} finished! All {expected_bet_count} bets settled.")
                     else:
                         logger.info(f"Bet {bet_id} updated. {len(merged_results)}/{expected_bet_count} settled.")
@@ -1060,7 +1144,7 @@ class BettingManager:
                         # Trigger learnings analysis for this finished bet
                         try:
                             full_bet_data = {**bet_doc, **update_data}
-                            LearningsManager().analyze_finished_bet(full_bet_data)
+                            self.get_learnings_manager().analyze_finished_bet(full_bet_data)
                         except Exception as le:
                             logger.error(f"Error triggering learnings analysis for bet {bet_id}: {le}")
                     
