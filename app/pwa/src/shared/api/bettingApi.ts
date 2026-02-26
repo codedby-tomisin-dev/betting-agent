@@ -25,6 +25,15 @@ export const triggerAutomatedBetting = async (date?: string) => {
 };
 
 /**
+ * Trigger hourly automated betting (sources next-hour games and bets immediately)
+ */
+export const triggerHourlyBetting = async () => {
+    const trigger = httpsCallable(functions, 'hourly_automated_betting_http');
+    const result = await trigger({});
+    return result.data;
+};
+
+/**
  * Get paginated bet history
  */
 export const getBetHistory = async (

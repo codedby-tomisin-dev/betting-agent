@@ -176,17 +176,6 @@ class AutomatedBettingService:
         """
         logger.info("Starting hourly automated betting execution")
 
-        # Prevent stacking bets while active ones are in play
-        try:
-            if self.repo.get_placed_bets(limit=1):
-                logger.info(
-                    "Active placed bets found. Skipping hourly execution to prevent stacking risk."
-                )
-                return {"status": "skipped", "reason": "Active bets in progress"}
-        except Exception as e:
-            logger.error(f"Error checking active bets: {e}")
-            return {"status": "error", "reason": f"Failed to check active bets: {e}"}
-
         # Source upcoming games
         try:
             now = datetime.now(timezone.utc)

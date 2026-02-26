@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Power, RefreshCw, Flame } from "lucide-react";
+import { Power, RefreshCw, Flame, Zap } from "lucide-react";
 import { useSettings } from "@/shared/hooks/useSettings";
 import { updateSettings } from "@/shared/api/settingsApi";
 import { httpsCallable } from "firebase/functions";
@@ -9,6 +9,7 @@ import { functions } from "@/shared/api/firebase";
 import { toast } from "sonner";
 import Link from "next/link";
 import { resolveRiskAppetiteLabel } from "@/features/settings/utils/resolveRiskAppetiteLabel";
+import { triggerHourlyBetting } from "@/shared/api/bettingApi";
 
 /** Maps risk appetite (1–5) to flame icon + background colors. */
 function getFlameStyle(appetite: number) {
@@ -24,6 +25,7 @@ export function ControlPanelCard() {
     const { settings, loading } = useSettings();
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isToggling, setIsToggling] = useState(false);
+    const [isBettingNow, setIsBettingNow] = useState(false);
 
     if (loading) {
         return (
@@ -80,6 +82,29 @@ export function ControlPanelCard() {
         }
     };
 
+    const handleBetNow = async () => {
+        setIsBettingNow(true);
+        try {
+            toast.info("Sourcing next-hour games…");
+            const result = await triggerHourlyBetting() as { status: string; reason?: string; bet_id?: string };
+            if (result?.status === "success") {
+                toast.success(`Bet placed! ID: ${result.bet_id}`);
+            } else if (result?.status === "skipped") {
+                toast.warning(`Skipped: ${result.reason}`);
+            } else {
+                toast.info("Hourly bet triggered.");
+            }
+        } catch (error: unknown) {
+            if (error instanceof Error) {
+                toast.error(error.message || "Failed to trigger hourly bet");
+            } else {
+                toast.error("Failed to trigger hourly bet");
+            }
+        } finally {
+            setIsBettingNow(false);
+        }
+    };
+
     return (
         <Card className="h-full bg-transparent border-0 shadow-none flex flex-col justify-center w-full">
             <CardContent className="p-0 flex items-center justify-center gap-6 sm:gap-12">
@@ -118,6 +143,25 @@ export function ControlPanelCard() {
                     </Button>
                     <span className="text-base font-semibold text-slate-700">
                         Refresh
+                    </span>
+                </div>
+
+                {/* Bet Now (Hourly) */}
+                <div className="flex flex-col items-center gap-3">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleBetNow}
+                        disabled={isBettingNow}
+                        className={`h-16 w-16 rounded-full border-2 transition-colors ${isBettingNow
+                            ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/30"
+                            : "bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100 hover:border-emerald-300"
+                            }`}
+                    >
+                        <Zap className={`h-6 w-6 ${isBettingNow ? "animate-pulse" : ""}`} />
+                    </Button>
+                    <span className="text-base font-semibold text-emerald-700">
+                        {isBettingNow ? "Betting…" : "Bet Now"}
                     </span>
                 </div>
 
