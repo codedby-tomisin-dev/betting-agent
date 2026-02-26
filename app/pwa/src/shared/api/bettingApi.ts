@@ -25,12 +25,30 @@ export const triggerAutomatedBetting = async (date?: string) => {
 };
 
 /**
- * Trigger hourly automated betting (sources next-hour games and bets immediately)
+ * Trigger hourly automated betting (sources next-hour games and bets immediately).
+ * Uses plain HTTP so it is also reachable via Postman / cURL.
  */
 export const triggerHourlyBetting = async () => {
-    const trigger = httpsCallable(functions, 'hourly_automated_betting_http');
-    const result = await trigger({});
-    return result.data;
+    const isDev = typeof globalThis.window !== "undefined" && globalThis.window.location.hostname === "localhost";
+    const projectId = "skilful-sphere-392008";
+    const region = "europe-west2";
+    const baseUrl = isDev
+        ? `http://127.0.0.1:5001/${projectId}/${region}`
+        : `https://${region}-${projectId}.cloudfunctions.net`;
+
+    const response = await fetch(`${baseUrl}/hourly_automated_betting_http`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return result.data ?? result;
 };
 
 /**
