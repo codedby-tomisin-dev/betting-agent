@@ -153,14 +153,11 @@ export function ControlPanelCard() {
                         size="icon"
                         onClick={handleBetNow}
                         disabled={isBettingNow}
-                        className={`h-16 w-16 rounded-full border-2 transition-colors ${isBettingNow
-                            ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/30"
-                            : "bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100 hover:border-emerald-300"
-                            }`}
+                        className="h-16 w-16 rounded-full border-2 bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm"
                     >
                         <Zap className={`h-6 w-6 ${isBettingNow ? "animate-pulse" : ""}`} />
                     </Button>
-                    <span className="text-base font-semibold text-emerald-700">
+                    <span className="text-base font-semibold text-slate-700">
                         {isBettingNow ? "Betting…" : "Bet Now"}
                     </span>
                 </div>

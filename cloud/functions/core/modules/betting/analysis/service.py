@@ -91,7 +91,7 @@ class BettingAnalysisService:
     def _partition_events(
         self, events: List[Event]
     ) -> tuple[List[Event], List[Event]]:
-        """Split events into reliable (route to AI) and unreliable (route to fallback)."""
+        """Split events into reliable (AI pipeline) and unreliable (scripted fallback)."""
         reliable, unreliable = [], []
         for event in events:
             is_reliable = event.competition_name in RELIABLE_COMPETITIONS or any(
@@ -100,12 +100,31 @@ class BettingAnalysisService:
             (reliable if is_reliable else unreliable).append(event)
         return reliable, unreliable
 
+    def _select_fallback_event(
+        self, reliable: List[Event], unreliable: List[Event]
+    ) -> List[Event]:
+        """
+        When no reliable events are found, fall back to one randomly selected
+        unreliable event rather than skipping entirely.
+        """
+        if reliable or not unreliable:
+            return unreliable  # use all unreliable events for scripted fallbacks as normal
+
+        chosen = random.choice(unreliable)
+        logger.info(
+            f"No reliable events found. Randomly selected '{chosen.event_name}' "
+            "from unreliable pool as sole fallback."
+        )
+        return [chosen]
+
     def analyze_betting_opportunities(self, request: AnalyzeBetsRequest) -> Dict[str, Any]:
         """
         Analyze betting opportunities using AI agents with web research.
 
-        Events in recognized leagues are sent to the full AI sourcing + decision pipeline.
-        Events in unrecognized leagues receive a scripted fallback recommendation.
+        Routing rules:
+        - Reliable events  → full AI sourcing + decision pipeline.
+        - Unreliable events → scripted fallback (safe goal-ceiling market).
+        - If *no* reliable events exist → one random unreliable event gets the fallback.
 
         Returns a dict with keys: total_stake, total_returns, selections, overall_reasoning.
         """
@@ -129,10 +148,11 @@ class BettingAnalysisService:
         )
 
         reliable_events, unreliable_events = self._partition_events(events)
+        fallback_events = self._select_fallback_event(reliable_events, unreliable_events)
 
-        # --- Scripted fallbacks for unreliable events ---
+        # --- Scripted fallbacks ---
         fallback_recommendations = []
-        for event in unreliable_events:
+        for event in fallback_events:
             logger.info(
                 f"Event '{event.event_name}' not in reliable leagues. Applying scripted fallback."
             )
