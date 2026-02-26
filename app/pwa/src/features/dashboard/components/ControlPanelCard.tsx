@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Power, RefreshCw, Flame, Zap } from "lucide-react";
+import { Power, RefreshCw, Flame, Dice5 } from "lucide-react";
 import { useSettings } from "@/shared/hooks/useSettings";
 import { updateSettings } from "@/shared/api/settingsApi";
 import { httpsCallable } from "firebase/functions";
@@ -155,10 +155,10 @@ export function ControlPanelCard() {
                         disabled={isBettingNow}
                         className="h-16 w-16 rounded-full border-2 bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm"
                     >
-                        <Zap className={`h-6 w-6 ${isBettingNow ? "animate-pulse" : ""}`} />
+                        <Dice5 className={`h-6 w-6 ${isBettingNow ? "animate-spin" : ""}`} />
                     </Button>
                     <span className="text-base font-semibold text-slate-700">
-                        {isBettingNow ? "Betting…" : "Bet Now"}
+                        {isBettingNow ? "Rolling…" : "Roll Dice"}
                     </span>
                 </div>
 
