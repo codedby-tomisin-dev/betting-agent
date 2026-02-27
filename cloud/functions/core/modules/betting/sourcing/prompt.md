@@ -19,27 +19,18 @@ You have exactly **one tool**: `search_match_news(query, freshness_days)`.
 
 Each call must use a high-signal, news-optimised query. Broad queries surface more articles than narrow ones — use both team names together, and favour common football news phrases that sports outlets actually write.
 
-### The 2 Required Calls
+### The 1 Required Call
 
 **Call 1 — Match preview, injuries, and form**
-> `"{Home} vs {Away} preview injuries form {Month Year}"`
+> `"{Home} vs {Away} preview  form {Month Year}"`
 
-Example: `"Tottenham vs Arsenal preview injuries form February 2026"`
+Example: `"Tottenham vs Arsenal preview form February 2026"`
 
-Extracts: `key_injuries`, `key_suspensions`, `form_last_5`, `match_context`, `h2h_summary`, etc.
-
----
-
-**Call 2 — Competition standings**
-> `"{Competition} table standings {Month Year}"`
-
-Example: `"Premier League table standings February 2026"`
-
-Extracts: `league_position` for both teams (look for the table, check both home and away team rows)
+Extracts: `key_injuries`, `key_suspensions`, `form_last_5`, `match_context`, `h2h_summary`, `league_position` etc.
 
 ---
 
-**Use `freshness_days=14` for all calls.** Do not make additional searches if a call returns no results — mark those fields as unknown and move on.
+**Use `freshness_days=14` for all calls.** Do not make additional searches if a call returns no results — mark those fields as unknown and move on immediately.
 
 ---
 
@@ -54,7 +45,7 @@ Extracts: `league_position` for both teams (look for the table, check both home 
 | `is_rotating` | `true` only if explicitly stated (B-team named, multiple changes confirmed). |
 | `goalkeeper_is_backup` | `true` only if explicitly reported. |
 | `match_context` | One of: Derby, Title decider, Relegation 6-pointer, Cup Final, Champions League knockout, Dead rubber, Standard league fixture. |
-| `data_confidence` | `HIGH` = rich results from all 2 calls. `MEDIUM` = partial. `LOW` = mostly empty results. |
+| `data_confidence` | `HIGH` = rich results from the call. `MEDIUM` = partial. `LOW` = mostly empty results. |
 
 ---
 
@@ -75,4 +66,4 @@ Write 2–4 sentences in `sourcing_notes`:
 > - If the competition is `"English Premier League"` → use `"English Premier League"` — NOT `"Premier League"`
 > Any mismatch will break the downstream bet matching. Copy the string. Do not reformat it.
 
-Return a complete `MatchIntelligenceReport` after all 2 calls. Fill every field you found data for. Leave fields `null` or empty if genuinely unavailable.
+Return a complete `MatchIntelligenceReport` after the call. Fill every field you found data for. Leave fields `null` or empty if genuinely unavailable.

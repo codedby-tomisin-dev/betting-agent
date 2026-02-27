@@ -90,7 +90,11 @@ def gather_intelligence(events: List[Event]) -> str:
 
         try:
             logger.info(f"Sourcing agent running for {event.event_name}")
-            result = sourcing_agent.run_sync(prompt, usage_limits=UsageLimits(request_limit=10))
+            result = sourcing_agent.run_sync(
+                prompt,
+                usage_limits=UsageLimits(request_limit=2),
+                message_history=[],  # Ensure fresh history per run
+            )
             report: MatchIntelligenceReport = result.output
             logger.info(f"Sourcing complete for {event.event_name} — confidence: {report.data_confidence}")
             sections.append(_format_intelligence_report(event.event_name, report))

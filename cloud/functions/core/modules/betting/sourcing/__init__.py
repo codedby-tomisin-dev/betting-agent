@@ -4,7 +4,6 @@ from pydantic_ai import Agent
 from pydantic_ai.models.gemini import GeminiModel
 from pydantic_ai.common_tools.duckduckgo import duckduckgo_search_tool
 
-
 from .tools import search_match_news
 from ..models import MatchIntelligenceReport
 
