@@ -24,70 +24,6 @@ class BettingAnalysisService:
         settings = self.settings_manager.get_betting_settings()
         return stake >= settings.min_stake and stake * (odds - 1) >= settings.min_profit
 
-    def _build_fallback_recommendation(
-        self, event: Event, min_profit: float, budget: float
-    ) -> "BettingAgentResponse.BetRecommendation | None":
-        """
-        For unrecognized leagues, randomly selects a structurally safe goal ceiling market.
-        Returns None if no suitable option is found or the stake fails validation.
-        """
-        fallback_targets = [
-            ("OVER_UNDER_05", "Over 0.5 Goals"),
-            ("OVER_UNDER_55", "Under 5.5 Goals"),
-            ("OVER_UNDER_65", "Under 6.5 Goals"),
-        ]
-        random.shuffle(fallback_targets)
-
-        selected_option = None
-        selected_market = None
-
-        for market_name, option_name in fallback_targets:
-            for market in event.options:
-                if market.name == market_name:
-                    for opt in market.options:
-                        if opt.name == option_name:
-                            selected_option = opt
-                            selected_market = market
-                            break
-                if selected_option:
-                    break
-            if selected_option:
-                break
-
-        if not selected_option or not selected_market:
-            return None
-
-        # Stake is calculated to just exceed min_profit. Rounded up to avoid float imprecision.
-        stake = (min_profit + 0.1) / (selected_option.odds - 1) if selected_option.odds > 1.0 else 0
-        stake = math.ceil(stake)
-        stake = min(stake, budget)
-        stake = max(stake, 1.0)
-
-        if not self._is_valid_bet(stake, selected_option.odds):
-            logger.info(
-                f"Fallback {selected_option.name} @ {selected_option.odds} skipped: "
-                f"stake {stake:.2f} failed validation."
-            )
-            return None
-
-        return BettingAgentResponse.BetRecommendation(
-            pick=BettingAgentResponse.BetRecommendation.Pick(
-                event_name=event.event_name,
-                market_name=selected_market.name,
-                option_name=selected_option.name,
-            ),
-            market_id=selected_market.market_id,
-            selection_id=selected_option.selection_id,
-            stake=round(stake, 2),
-            odds=selected_option.odds,
-            side="BACK",
-            reasoning=(
-                "Scripted fallback: Low-information match in unrecognized league. "
-                "Structurally safe goal ceiling chosen."
-            ),
-            stake_justification=f"Minimum profit requirement dictated a ${stake:.2f} stake.",
-        )
-
     def _partition_events(
         self, events: List[Event]
     ) -> tuple[List[Event], List[Event]]:
@@ -117,17 +53,42 @@ class BettingAnalysisService:
         )
         return [chosen]
 
+    def _filter_fallback_markets(self, events: List[Event]) -> List[Event]:
+        """
+        Create copies of events containing only the safe goal ceiling markets
+        to prevent the fallback agent from getting confused by or selecting
+        unsupported markets like Match Odds.
+        """
+        allowed_markets = ["Over 0.5 Goals", "Under 4.5 Goals", "Under 5.5 Goals", "Under 6.5 Goals"]
+        filtered_events = []
+        for event in events:
+            # Create a shallow copy of the event to avoid mutating the original request
+            from copy import copy
+            filtered_event = copy(event)
+            filtered_options = []
+            for market in event.options:
+                filtered_market = copy(market)
+                filtered_market.options = [opt for opt in market.options if opt.name in allowed_markets]
+                if filtered_market.options:
+                    filtered_options.append(filtered_market)
+            filtered_event.options = filtered_options
+            if filtered_options:
+                filtered_events.append(filtered_event)
+        return filtered_events
+
     def analyze_betting_opportunities(self, request: AnalyzeBetsRequest) -> Dict[str, Any]:
         """
         Analyze betting opportunities using AI agents with web research.
 
         Routing rules:
         - Reliable events  → full AI sourcing + decision pipeline.
-        - Unreliable events → scripted fallback (safe goal-ceiling market).
+        - Unreliable events → Fallback AI (odds-based deduction on safe goal-ceilings).
         - If *no* reliable events exist → one random unreliable event gets the fallback.
 
         Returns a dict with keys: total_stake, total_returns, selections, overall_reasoning.
         """
+        from core.modules.betting.agent.service import make_fallback_selections
+
         try:
             events = [Event(**event) for event in request.events]
         except Exception as e:
@@ -150,19 +111,35 @@ class BettingAnalysisService:
         reliable_events, unreliable_events = self._partition_events(events)
         fallback_events = self._select_fallback_event(reliable_events, unreliable_events)
 
-        # --- Scripted fallbacks ---
+        # --- AI Fallback pipeline ---
         fallback_recommendations = []
-        for event in fallback_events:
+        if fallback_events:
             logger.info(
-                f"Event '{event.event_name}' not in reliable leagues. Applying scripted fallback."
+                f"Routing {len(fallback_events)} low-information events to Fallback AI."
             )
-            rec = self._build_fallback_recommendation(event, request.min_profit, request.budget)
-            if rec:
-                fallback_recommendations.append(rec)
+            filtered_fallbacks = self._filter_fallback_markets(fallback_events)
+            if filtered_fallbacks:
+                try:
+                    fallback_response = make_fallback_selections(
+                        events=filtered_fallbacks,
+                        budget=request.budget,
+                        min_profit=request.min_profit,
+                    )
+                    for rec in fallback_response.recommendations:
+                        if self._is_valid_bet(rec.stake, rec.odds):
+                            fallback_recommendations.append(rec)
+                        else:
+                            potential_profit = rec.stake * (rec.odds - 1)
+                            logger.warning(
+                                f"Skipping Fallback AI rec — stake: {rec.stake}, "
+                                f"profit: {potential_profit:.3f} — {rec.pick.event_name}"
+                            )
+                except Exception as e:
+                    logger.error(f"Error analyzing fallback events: {e}")
 
         logger.info(
-            f"Routing {len(reliable_events)} events to AI, "
-            f"generated {len(fallback_recommendations)} fallback recommendations."
+            f"Routing {len(reliable_events)} events to standard AI, "
+            f"yielded {len(fallback_recommendations)} fallback recommendations."
         )
 
         # --- AI pipeline for reliable events ---

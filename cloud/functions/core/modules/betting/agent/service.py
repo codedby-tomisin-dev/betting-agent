@@ -88,3 +88,33 @@ def make_bet_selections(
     )
     result = betting_agent.run_sync(prompt)
     return result.output
+
+
+def make_fallback_selections(
+    events: List[Event], budget: float, min_profit: float
+) -> BettingAgentResponse:
+    """
+    Build the prompt for the fallback agent and run it.
+    Only allows the fallback agent to see the specific goal markets it is allowed to bet on,
+    saving context and preventing hallucinations.
+    """
+    all_events_str = _format_events(events)
+
+    prompt = f"""Analyze the odds for these low-information matches.
+
+=== AVAILABLE FALLBACK BETS ===
+{all_events_str}
+
+CRITICAL RULES:
+1. Deduce the expected match volatility purely from the odds.
+2. Select EXACTLY ONE bet recommendation.
+3. The chosen bet MUST generate a profit of AT LEAST ${min_profit:.2f}.
+4. The stake required to meet that profit MUST NOT exceed your total budget of ${budget:.2f}.
+
+Budget: ${budget:.2f}
+Minimum Profit Required: ${min_profit:.2f}
+"""
+
+    from . import fallback_agent  # imported here to avoid circular dependencies if any
+    result = fallback_agent.run_sync(prompt)
+    return result.output
