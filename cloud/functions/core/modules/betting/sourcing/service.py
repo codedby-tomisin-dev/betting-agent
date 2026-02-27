@@ -64,7 +64,7 @@ def _build_sourcing_prompt(event: Event, home_team: str, away_team: str) -> str:
     )
 
 
-def gather_intelligence(events: List[Event]) -> str:
+def gather_intelligence(events: List[Event]) -> Dict[str, str]:
     """
     Run the sourcing agent for every event and return a formatted intelligence block
     ready to be embedded in the decision agent's prompt.
@@ -76,10 +76,10 @@ def gather_intelligence(events: List[Event]) -> str:
         events: Parsed Event objects to source intelligence for.
 
     Returns:
-        A single string containing all intelligence reports, or an empty string if
-        sourcing failed for all events.
+        A dictionary mapping event_name to intelligence string. Events that
+        failed sourcing or returned LOW confidence are omitted.
     """
-    sections: List[str] = []
+    results: Dict[str, str] = {}
 
     for event in events:
         parts = event.event_name.replace(" vs ", " v ").split(" v ", 1)
@@ -96,10 +96,13 @@ def gather_intelligence(events: List[Event]) -> str:
                 message_history=[],  # Ensure fresh history per run
             )
             report: MatchIntelligenceReport = result.output
-            logger.info(f"Sourcing complete for {event.event_name} — confidence: {report.data_confidence}")
-            sections.append(_format_intelligence_report(event.event_name, report))
+            if report.data_confidence.upper() == "LOW":
+                logger.warning(f"Sourcing agent found no usable data for {event.event_name} (LOW confidence).")
+            else:
+                logger.info(f"Sourcing complete for {event.event_name} — confidence: {report.data_confidence}")
+                results[event.event_name] = _format_intelligence_report(event.event_name, report)
         except Exception as e:
             logger.error(f"Sourcing agent failed for {event.event_name}: {e}")
             # Omit this event — decision agent will notice missing intelligence
 
-    return "\n".join(sections)
+    return results

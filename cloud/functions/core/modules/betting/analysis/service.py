@@ -119,6 +119,24 @@ class BettingAnalysisService:
         )
 
         reliable_events, unreliable_events = self._partition_events(events)
+
+        # --- Gather intelligence for reliable events ---
+        intelligence_section = ""
+        if reliable_events:
+            intelligence_map = gather_intelligence(reliable_events)
+            successful_reliable_events = []
+            sections = []
+            for event in reliable_events:
+                if event.event_name in intelligence_map:
+                    successful_reliable_events.append(event)
+                    sections.append(intelligence_map[event.event_name])
+                else:
+                    logger.info(f"Routing '{event.event_name}' to fallback due to lack of sourcing data.")
+                    unreliable_events.append(event)
+            
+            reliable_events = successful_reliable_events
+            intelligence_section = "\n".join(sections)
+
         fallback_events = self._select_fallback_event(reliable_events, unreliable_events)
 
         # --- AI Fallback pipeline ---
@@ -159,7 +177,6 @@ class BettingAnalysisService:
         overall_reasoning = ""
 
         if reliable_events:
-            intelligence_section = gather_intelligence(reliable_events)
             try:
                 response_data: BettingAgentResponse = make_bet_selections(
                     events=reliable_events,
