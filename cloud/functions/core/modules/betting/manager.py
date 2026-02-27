@@ -62,6 +62,8 @@ class BettingManager:
         self._analysis = BettingAnalysisService(
             settings_manager=settings,
             learnings_manager=learnings,
+            wallet_service=wallet,
+            bet_repo=repo,
         )
         self._placement = BetPlacementService(
             betfair_service=betfair,

@@ -8,6 +8,8 @@ from core.modules.betting.sourcing.service import gather_intelligence
 from core.modules.betting.models import AnalyzeBetsRequest, BettingAgentResponse
 from core.modules.settings.manager import SettingsManager
 from core.modules.learnings.manager import LearningsManager
+from core.modules.wallet.service import WalletService
+from core.modules.betting.repository import BetRepository
 from constants import RELIABLE_ALL_TEAMS, RELIABLE_COMPETITIONS
 from third_party.betting_platforms.models import Event
 
@@ -15,9 +17,17 @@ from third_party.betting_platforms.models import Event
 class BettingAnalysisService:
     """Handles AI-driven betting analysis: event routing, intelligence sourcing, and decision making."""
 
-    def __init__(self, settings_manager: SettingsManager, learnings_manager: LearningsManager):
+    def __init__(
+        self, 
+        settings_manager: SettingsManager, 
+        learnings_manager: LearningsManager,
+        wallet_service: WalletService = None,
+        bet_repo: BetRepository = None
+    ):
         self.settings_manager = settings_manager
         self.learnings_manager = learnings_manager
+        self.wallet_service = wallet_service or WalletService()
+        self.bet_repo = bet_repo or BetRepository()
 
     def _is_valid_bet(self, stake: float, odds: float) -> bool:
         """Return True if a bet meets the minimum stake and profit requirements."""
@@ -124,6 +134,8 @@ class BettingAnalysisService:
                         events=filtered_fallbacks,
                         budget=request.budget,
                         min_profit=request.min_profit,
+                        wallet_service=self.wallet_service,
+                        bet_repo=self.bet_repo,
                     )
                     for rec in fallback_response.recommendations:
                         if self._is_valid_bet(rec.stake, rec.odds):
@@ -155,6 +167,8 @@ class BettingAnalysisService:
                     budget=request.budget,
                     min_profit=request.min_profit,
                     risk_appetite=request.risk_appetite,
+                    wallet_service=self.wallet_service,
+                    bet_repo=self.bet_repo,
                     learnings_section=learnings_section,
                 )
                 overall_reasoning = response_data.overall_reasoning

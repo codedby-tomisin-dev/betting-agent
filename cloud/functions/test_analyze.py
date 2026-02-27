@@ -8,6 +8,7 @@ load_dotenv()
 
 from core.modules.betting.manager import BettingManager
 from core.modules.betting.models import AnalyzeBetsRequest
+from core.modules.settings.models import BettingSettings
 from core import logger
 
 class MockLearningsManager:
@@ -16,9 +17,26 @@ class MockLearningsManager:
         return "Always check if key players are injured."
 
 class MockBetRepository:
-    pass
+    def get_all_finished_bets(self, limit=5):
+        return [
+            {
+                "id": "1",
+                "status": "finished",
+                "balance": {"starting": 100.0, "ending": 110.5},
+                "selections": {"wager": {"odds": 1.8, "stake": 10.0}}
+            },
+            {
+                "id": "2",
+                "status": "finished",
+                "balance": {"starting": 110.5, "ending": 118.0},
+                "selections": {"wager": {"odds": 1.5, "stake": 15.0}}
+            }
+        ]
 
-from core.modules.settings.models import BettingSettings
+class MockWalletService:
+    def get_available_balance(self):
+        return 118.0
+
 
 class MockSettingsManager:
     def get_betting_settings(self) -> BettingSettings:
@@ -37,8 +55,6 @@ class MockBetfairService:
 
 def main():
     # Construct a mock event
-    tomorrow = datetime.now(timezone.utc) + timedelta(days=1)
-    
     mock_event = {
             "provider_event_id": "35240883",
             "name": "Everton v Man Utd",
@@ -246,8 +262,8 @@ def main():
         bet_repo=MockBetRepository(),
         settings_manager=MockSettingsManager(),
         learnings_manager=MockLearningsManager(),
-        suggestion_repo=MockBetRepository(),  # Reuse mock
-        wallet_service=MockBetRepository(),   # Reuse mock
+        suggestion_repo=MockBetRepository(),
+        wallet_service=MockWalletService(),
     )
     
     print("\nStarting analysis...")

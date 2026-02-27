@@ -2,8 +2,10 @@ from typing import List
 
 from third_party.betting_platforms.models import Event
 
-from . import betting_agent
+from . import betting_agent, AgentDeps
 from ..models import BettingAgentResponse
+from core.modules.wallet.service import WalletService
+from core.modules.betting.repository import BetRepository
 
 
 def _format_events(events: List[Event]) -> str:
@@ -70,6 +72,8 @@ def make_bet_selections(
     budget: float,
     min_profit: float,
     risk_appetite: float,
+    wallet_service: WalletService,
+    bet_repo: BetRepository,
     learnings_section: str = "",
 ) -> BettingAgentResponse:
     """
@@ -86,12 +90,17 @@ def make_bet_selections(
         risk_appetite=risk_appetite,
         learnings_section=learnings_section,
     )
-    result = betting_agent.run_sync(prompt)
+    deps = AgentDeps(wallet_service=wallet_service, bet_repo=bet_repo)
+    result = betting_agent.run_sync(prompt, deps=deps)
     return result.output
 
 
 def make_fallback_selections(
-    events: List[Event], budget: float, min_profit: float
+    events: List[Event], 
+    budget: float, 
+    min_profit: float,
+    wallet_service: WalletService,
+    bet_repo: BetRepository,
 ) -> BettingAgentResponse:
     """
     Build the prompt for the fallback agent and run it.
@@ -116,5 +125,6 @@ Minimum Profit Required: ${min_profit:.2f}
 """
 
     from . import fallback_agent  # imported here to avoid circular dependencies if any
-    result = fallback_agent.run_sync(prompt)
+    deps = AgentDeps(wallet_service=wallet_service, bet_repo=bet_repo)
+    result = fallback_agent.run_sync(prompt, deps=deps)
     return result.output
