@@ -69,7 +69,13 @@ class BettingAnalysisService:
         to prevent the fallback agent from getting confused by or selecting
         unsupported markets like Match Odds.
         """
-        allowed_markets = ["Over 0.5 Goals", "Under 4.5 Goals", "Under 5.5 Goals", "Under 6.5 Goals"]
+        allowed_markets = [
+            "Over 0.5 Goals", "Over 1.5 Goals", "Under 4.5 Goals", "Under 5.5 Goals", "Under 6.5 Goals",
+            "Yes", "No", # Both teams to score
+            "Home", "Away", "The Draw", # Match odds
+            "Home or Draw", "Draw or Away", "Home or Away", # Double chance
+            "Match Odds", "Double Chance", "Both teams to Score" # In case market name is matched
+        ]
         filtered_events = []
         for event in events:
             # Create a shallow copy of the event to avoid mutating the original request
