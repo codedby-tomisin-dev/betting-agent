@@ -37,6 +37,8 @@ def _build_decision_prompt(
         else "No intelligence available — apply Low-Information rules from the Handbook."
     )
 
+    min_valid_odds = 1.0 + (min_profit / budget) if budget > 0 else 1.0
+
     return f"""Analyze these betting opportunities and provide exactly 3 best betting recommendations.
 
 === AVAILABLE BETS ===
@@ -51,7 +53,8 @@ CRITICAL REQUIREMENTS:
 2. The total stake of all selected bets MUST NOT exceed ${budget:.2f}.
 3. Allocate the budget wisely among your selected bets based on confidence and value.
 4. Each selection MUST generate a profit of AT LEAST ${min_profit:.2f} (Profit = Stake * (Odds - 1)).
-5. **NAMES — COPY VERBATIM, DO NOT INTERPRET:**
+5. **Mathematical Minimum Odds: {min_valid_odds:.2f}**. You CANNOT select any outcome with odds lower than this, as it is mathematically impossible to meet the minimum profit within your budget.
+6. **NAMES — COPY VERBATIM, DO NOT INTERPRET:**
    You MUST use `event_name`, `market_name`, and `option_name` exactly as they appear above.
    - "Tottenham v Arsenal" must stay "Tottenham v Arsenal" — NOT "Tottenham vs Arsenal"
    - "OVER_UNDER_25" must stay "OVER_UNDER_25" — NOT "Over/Under 2.5"
@@ -109,6 +112,8 @@ def make_fallback_selections(
     """
     all_events_str = _format_events(events)
 
+    min_valid_odds = 1.0 + (min_profit / budget) if budget > 0 else 1.0
+
     prompt = f"""Analyze the odds for these low-information matches.
 
 === AVAILABLE FALLBACK BETS ===
@@ -118,10 +123,11 @@ CRITICAL RULES:
 1. Deduce the expected match volatility purely from the odds.
 2. Select EXACTLY ONE bet recommendation.
 3. The chosen bet MUST generate a profit of AT LEAST ${min_profit:.2f}.
-4. The stake required to meet that profit MUST NOT exceed your total budget of ${budget:.2f}.
+4. Utilize your allocated budget WISELY. You may stake up to the full budget of ${budget:.2f} depending on the safety (odds) of the selection.
 
 Budget: ${budget:.2f}
 Minimum Profit Required: ${min_profit:.2f}
+Mathematical Minimum Odds: {min_valid_odds:.2f} (You CANNOT select odds lower than this, as it is mathematically impossible to meet the profit target using your budget constraint).
 """
 
     from . import fallback_agent  # imported here to avoid circular dependencies if any

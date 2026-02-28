@@ -156,6 +156,10 @@ class BettingAnalysisService:
                         bet_repo=self.bet_repo,
                     )
                     for rec in fallback_response.recommendations:
+                        if rec.stake > request.budget:
+                            logger.warning(f"Fallback AI stake {rec.stake} exceeded budget {request.budget}. Capping stake.")
+                            rec.stake = request.budget
+                            
                         if self._is_valid_bet(rec.stake, rec.odds):
                             fallback_recommendations.append(rec)
                         else:
@@ -190,6 +194,10 @@ class BettingAnalysisService:
                 )
                 overall_reasoning = response_data.overall_reasoning
                 for rec in response_data.recommendations:
+                    if rec.stake > request.budget:
+                        logger.warning(f"Standard AI stake {rec.stake} exceeded budget {request.budget}. Capping stake.")
+                        rec.stake = request.budget
+
                     if self._is_valid_bet(rec.stake, rec.odds):
                         ai_recommendations.append(rec)
                     else:
@@ -214,7 +222,19 @@ class BettingAnalysisService:
             )
             for rec in all_recommendations:
                 rec.stake = rec.stake * scale_factor
-            total_stake = request.budget
+            
+            # Re-validate against min profit after scaling down
+            valid_scaled_recs = []
+            for rec in all_recommendations:
+                if self._is_valid_bet(rec.stake, rec.odds):
+                    valid_scaled_recs.append(rec)
+                else:
+                    logger.warning(
+                        f"Dropping bet after budget scale-down (profit too low): "
+                        f"{rec.pick.event_name} @ {rec.odds} with stake ${rec.stake:.2f}"
+                    )
+            all_recommendations = valid_scaled_recs
+            total_stake = sum(rec.stake for rec in all_recommendations)
 
         total_returns = sum(rec.stake * rec.odds for rec in all_recommendations)
         total_odds = total_returns / total_stake if total_stake > 0 else 0
