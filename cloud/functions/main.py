@@ -13,7 +13,6 @@ from core.migrations.migrate_bet_slips import run_migration, migrate_single_docu
 from core.modules.betting.manager import BettingManager
 from core.modules.betting.models import AnalyzeBetsRequest, GetOddsRequest, PlaceBetRequest
 from core.modules.betting.repository import BetRepository
-from core.modules.betting.suggestion_repository import SuggestionRepository
 from core.modules.learnings.repository import LearningsRepository
 from core.modules.settings.repository import SettingsRepository
 from core.modules.wallet.repository import WalletRepository
@@ -32,7 +31,6 @@ def _make_settings_manager() -> SettingsManager:
 
 def _make_betting_manager() -> BettingManager:
     bet_repo = BetRepository()
-    suggestion_repo = SuggestionRepository()
     learnings_manager = LearningsManager(
         repository=LearningsRepository(),
         bet_repository=BetRepository(),
@@ -41,7 +39,6 @@ def _make_betting_manager() -> BettingManager:
     settings_manager = _make_settings_manager()
     return BettingManager(
         bet_repo=bet_repo,
-        suggestion_repo=suggestion_repo,
         learnings_manager=learnings_manager,
         wallet_service=wallet_service,
         settings_manager=settings_manager,
@@ -152,24 +149,6 @@ def hourly_automated_betting_http(req: https_fn.Request) -> https_fn.Response:
         return make_error_response(str(e))
 
 
-@scheduler_fn.on_schedule(
-    schedule='0 12 * * *',
-    memory=MemoryOption.GB_1,
-    timeout_sec=300,
-)
-def automated_suggestion_promotion(event: scheduler_fn.ScheduledEvent) -> None:
-    """
-    Automated scheduler to promote suggestions to bet slips.
-    Runs daily at 12:00 London time.
-    """
-    try:
-        logger.info("Automated suggestion promotion scheduler triggered")
-        manager = _make_betting_manager()
-        result = manager.promote_suggestions_to_bets()
-        logger.info(f"Suggestion promotion result: {result}")
-    except Exception as e:
-        logger.error(f"Error in automated suggestion promotion: {e}", exc_info=True)
-
 
 @https_fn.on_request(
     timeout_sec=300,
@@ -197,6 +176,48 @@ def automated_daily_betting_http(req: https_fn.Request) -> https_fn.Response:
         return make_success_response(result)
     except Exception as e:
         logger.error(f"Error in automated daily betting HTTP endpoint: {e}", exc_info=True)
+        return make_error_response(str(e))
+
+
+@scheduler_fn.on_schedule(
+    schedule='0 0 * * *',
+    memory=MemoryOption.GB_1,
+    timeout_sec=300,
+)
+def fetch_daily_fixtures_scheduled(event: scheduler_fn.ScheduledEvent) -> None:
+    """
+    Automated scheduler to fetch all daily fixtures at 12:00 AM UTC.
+    """
+    try:
+        logger.info("Automated daily fixtures fetch scheduler triggered")
+        manager = _make_betting_manager()
+        result = manager.fetch_and_store_daily_fixtures()
+        logger.info(f"Fetch daily fixtures result: {result}")
+    except Exception as e:
+        logger.error(f"Error in automated daily fixtures fetch: {e}", exc_info=True)
+
+
+
+@https_fn.on_request(
+    timeout_sec=300,
+    memory=MemoryOption.GB_1,
+    cors=cors_options
+)
+def fetch_daily_fixtures_http(req: https_fn.Request) -> https_fn.Response:
+    """
+    HTTP endpoint to manually trigger a fetch for daily fixtures.
+    """
+    try:
+        logger.info("Fetch daily fixtures HTTP endpoint triggered")
+        target_date = req.args.get('date', None)
+
+        manager = _make_betting_manager()
+        result = manager.fetch_and_store_daily_fixtures(
+            target_date=target_date
+        )
+        return make_success_response(result)
+    except Exception as e:
+        logger.error(f"Error in fetch daily fixtures HTTP endpoint: {e}", exc_info=True)
         return make_error_response(str(e))
 
 
@@ -280,11 +301,12 @@ def analyze_bet_intent(event: firestore_fn.Event[firestore_fn.DocumentSnapshot])
             pass
 
 
-@firestore_fn.on_document_created(document="suggestions/{suggestionId}", timeout_sec=540, memory=options.MemoryOption.GB_1)
-def analyze_suggestion(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) -> None:
+
+@firestore_fn.on_document_created(document="daily_fixtures/{dateId}/games/{gameId}", timeout_sec=540, memory=options.MemoryOption.GB_1)
+def analyze_daily_fixture(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) -> None:
     """
-    Triggered when a new suggestion is created in Firestore.
-    Performs AI analysis on the events and updates the suggestion with selections.
+    Triggered when a new daily fixture is mapped to Firestore.
+    Runs asynchronous AI analysis on the single game.
     """
     try:
         snapshot = event.data
@@ -292,40 +314,92 @@ def analyze_suggestion(event: firestore_fn.Event[firestore_fn.DocumentSnapshot])
             return
 
         data = snapshot.to_dict()
-        suggestion_id = event.params["suggestionId"]
+        date_id = event.params["dateId"]
+        game_id = event.params["gameId"]
         
-        # Only analyze if status is 'intent' (initial state)
-        if data.get("status") != "intent":
-             logger.info(f"Skipping suggestion analysis for {suggestion_id}: status is {data.get('status')}")
+        if data.get("analysis_status") != "pending":
+             logger.info(f"Skipping daily fixture analysis for {game_id}: status is {data.get('analysis_status')}")
              return
 
-        logger.info(f"Starting analysis for suggestion {suggestion_id}")
-        
-        preferences = data.get("preferences", {})
-        budget = preferences.get("budget", 10.0)
-        risk_appetite = preferences.get("risk_appetite", 3.0)
-        
-        settings = _make_settings_manager().get_betting_settings()
-        min_profit = preferences.get("min_profit", settings.min_profit)
-        
-        # Create AnalyzeBetsRequest object
-        analysis_request = AnalyzeBetsRequest(
-            events=data.get("events", []),
-            risk_appetite=risk_appetite,
-            budget=budget,
-            min_profit=min_profit
+        # Only analyze games from reliable competitions — all others are stored but not analyzed.
+        from constants import RELIABLE_COMPETITIONS as _RELIABLE
+        metadata = data.get("metadata", {})
+        competition_name = (
+            metadata.get("competition_name")
+            or (data.get("event", {}).get("competition") or {}).get("name")
         )
-        
-        manager = _make_betting_manager()
-        recommendations = manager.analyze_betting_opportunities(analysis_request)
-        manager.update_suggestion_analysis(suggestion_id, recommendations)
+        if competition_name and competition_name not in _RELIABLE:
+            logger.info(f"Skipping analysis for {game_id}: competition '{competition_name}' is not reliable")
+            return
 
-        logger.info(f"Analysis completed for suggestion {suggestion_id}")
-        
+        logger.info(f"Starting analysis for daily fixture {game_id} on {date_id}")
+
+        settings = _make_settings_manager().get_betting_settings()
+
+        # Reconstruct the event object for AnalyzeBetsRequest from the stored Firestore fields.
+        # The stored event has provider_event_id, name, time, competition, options.
+        game_event_raw = data.get("event", {})
+
+        # Ensure provider_event_id is present (stored field) — fall back to id or game_id
+        provider_event_id = (
+            game_event_raw.get("provider_event_id")
+            or game_event_raw.get("id")
+            or game_id
+        )
+
+        game_event = {
+            "provider_event_id": provider_event_id,
+            "name": game_event_raw.get("name"),
+            "time": game_event_raw.get("time"),
+            "competition": game_event_raw.get("competition") or {"name": "Unknown"},
+            "options": game_event_raw.get("options") or [],
+            "marketCount": data.get("marketCount", 0),
+        }
+
+        if not game_event.get("name") or not game_event.get("time"):
+            logger.error(f"Error analyzing daily fixture {game_id}: Invalid event data — missing name or time")
+            return
+
+        # Enrich with all market types (BTTS, Over/Under goals, etc.) before AI analysis.
+        # The daily fixture fetch only captures MATCH_ODDS — not enough for the agent's rules.
+        logger.info(f"Fetching full market data for event {provider_event_id}")
+        manager = _make_betting_manager()
+        live_markets = manager.betfair.get_event_markets(provider_event_id)
+        if live_markets:
+            game_event["options"] = live_markets
+            game_event["marketCount"] = len(live_markets)
+            logger.info(f"Enriched fixture {game_id} with {len(live_markets)} markets for analysis")
+            # Persist the fetched markets to Firestore so they're visible in the document
+            manager._daily_fixtures_repo_instance.save_fixture_markets(date_id, game_id, live_markets)
+        else:
+            logger.warning(f"Could not fetch live markets for {game_id} — proceeding with stored MATCH_ODDS only")
+
+        analysis_request = AnalyzeBetsRequest(
+            events=[game_event],
+            risk_appetite=settings.risk_appetite,
+            budget=settings.max_bankroll * (settings.bankroll_percent / 100),
+            min_profit=settings.min_profit
+        )
+
+        recommendations = manager.analyze_betting_opportunities(analysis_request)
+
+        selection_items = recommendations.get("selections", {}).get("items", [])
+
+        if not selection_items:
+            manager._daily_fixtures_repo_instance.mark_fixture_failed(date_id, game_id, "No suitable AI picks found")
+            logger.info(f"Analysis completed for fixture {game_id} — no picks found.")
+        else:
+            chosen = selection_items[0]
+            manager._daily_fixtures_repo_instance.update_fixture_analysis(date_id, game_id, [chosen], "completed")
+            logger.info(f"Analysis completed for fixture {game_id} — pick saved.")
+            
     except Exception as e:
-        logger.error(f"Error analyzing suggestion {event.params['suggestionId']}: {e}", exc_info=True)
-        # We don't mark suggestions as failed in the same way, or maybe we should?
-        # For now just log errors.
+        logger.error(f"Error analyzing daily fixture {event.params['gameId']}: {e}", exc_info=True)
+        try:
+            manager = _make_betting_manager()
+            manager._daily_fixtures_repo_instance.mark_fixture_failed(event.params["dateId"], event.params["gameId"], str(e))
+        except:
+            pass
 
 
 @firestore_fn.on_document_written(document="bet_slips/{betId}", timeout_sec=60, memory=options.MemoryOption.GB_1)

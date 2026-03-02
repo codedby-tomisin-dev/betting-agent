@@ -1,7 +1,7 @@
 import { httpsCallable } from "firebase/functions";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, onSnapshot, setDoc } from "firebase/firestore";
 import { functions, db } from "./firebase";
-import { BetSelectionItem, Bet, BetEvent, MarketOption } from "@/shared/types";
+import { BetSelectionItem, Bet, BetEvent, MarketOption, DailyFixture } from "@/shared/types";
 
 /**
  * Approve a bet intent and queue it for placement
@@ -265,6 +265,71 @@ export const fetchSuggestions = async (date: string): Promise<Bet[]> => {
         });
     } catch (error) {
         console.error("Error fetching suggestions:", error);
+        throw error;
+    }
+};
+
+/**
+ * Subscribe to Daily Fixtures in real-time
+ */
+export const subscribeDailyFixtures = (
+    date: string,
+    onNext: (fixtures: DailyFixture[]) => void,
+    onError?: (error: Error) => void
+) => {
+    const gamesRef = collection(db, "daily_fixtures", date, "games");
+
+    // We can order by time or just return all and sort on client
+    const q = query(gamesRef);
+
+    const unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+            const fixtures: DailyFixture[] = [];
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                fixtures.push({
+                    id: doc.id,
+                    ...data
+                } as DailyFixture);
+            });
+            // Sort by kick-off time, earliest first
+            fixtures.sort((a, b) => {
+                const tA = a.event?.time ? new Date(a.event.time).getTime() : Infinity;
+                const tB = b.event?.time ? new Date(b.event.time).getTime() : Infinity;
+                return tA - tB;
+            });
+            onNext(fixtures);
+        },
+        (error) => {
+            console.error("Error subscribing to daily fixtures:", error);
+            if (onError) onError(error);
+        }
+    );
+
+    return unsubscribe;
+};
+
+/**
+ * Update the user selections for a daily fixture
+ */
+export const updateFixtureSelections = async (
+    date: string,
+    providerEventId: string,
+    selections: BetSelectionItem[]
+) => {
+    try {
+        const gameRef = doc(db, "daily_fixtures", date, "games", providerEventId);
+
+        // Use merge to only update the selections array and set the user_modified flag
+        await setDoc(
+            gameRef,
+            { selections, user_modified: true },
+            { merge: true }
+        );
+        return true;
+    } catch (error) {
+        console.error("Error updating fixture selections:", error);
         throw error;
     }
 };

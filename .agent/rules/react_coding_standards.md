@@ -6,6 +6,8 @@ trigger: always_on
 
 These rules are designed to turn an AI-generated React codebase into a maintainable, scalable, and battle-tested project.
 
+## Important: Always refactor and clean up as you plan and write, to make sure you're maintaining clean code.
+
 ## 1. Separate "What" from "How"
 **Rule:** Components describe *what* happens. Hooks/services handle *how*.
 

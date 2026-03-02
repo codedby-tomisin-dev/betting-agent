@@ -26,6 +26,7 @@ class Event(BaseModel):
     time: datetime
     competition: Competition
     options: List[Option]
+    metadata: Optional[dict] = None
 
     # Legacy field accessors for backwards compatibility during migration
     @property

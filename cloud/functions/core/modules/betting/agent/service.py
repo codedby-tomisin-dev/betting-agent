@@ -6,13 +6,22 @@ from . import betting_agent, AgentDeps
 from ..models import BettingAgentResponse
 from core.modules.wallet.service import WalletService
 from core.modules.betting.repository import BetRepository
+from core.modules.betting.betfair_service import BetfairService
 
 
 def _format_events(events: List[Event]) -> str:
-    """Render the list of events + markets into a flat string for the decision agent."""
+    """Render the list of events + markets into a flat string for the agent."""
     lines = []
     for event in events:
-        block = f"Event: {event.event_name} ({event.competition_name}) - {event.event_time}\n"
+        metadata = event.metadata or {}
+        is_reliable_team = metadata.get("is_reliable_team", False)
+        is_reliable_comp = metadata.get("is_reliable_competition", False)
+        flags = []
+        if is_reliable_team: flags.append("Popular Team")
+        if is_reliable_comp: flags.append("Popular Competition")
+        flag_str = f" [{', '.join(flags)}]" if flags else ""
+
+        block = f"Event: {event.event_name} ({event.competition_name}){flag_str} - {event.event_time}\n"
         for option in event.options:
             block += f"  Market: {option.name} (ID: {option.market_id})\n"
             for selection in option.options:
@@ -21,116 +30,54 @@ def _format_events(events: List[Event]) -> str:
     return "\n".join(lines)
 
 
-def _build_decision_prompt(
+def make_bet_selections(
     events: List[Event],
-    intelligence_section: str,
     budget: float,
     min_profit: float,
     risk_appetite: float,
+    wallet_service: WalletService,
+    bet_repo: BetRepository,
+    betfair_service: BetfairService,
     learnings_section: str = "",
-) -> str:
-    risk_level = round(risk_appetite)
+) -> BettingAgentResponse:
+    """
+    Build the odds-analysis prompt and run the betting agent.
+
+    All events are evaluated purely from their market odds — no external
+    intelligence is gathered. The agent uses its built-in handbook rules
+    to infer match dynamics from the odds structure.
+    """
     all_events_str = _format_events(events)
-    intelligence_block = (
-        intelligence_section
-        if intelligence_section
-        else "No intelligence available — apply Low-Information rules from the Handbook."
-    )
-
     min_valid_odds = 1.0 + (min_profit / budget) if budget > 0 else 1.0
+    risk_level = round(risk_appetite)
 
-    return f"""Analyze these betting opportunities and provide exactly 3 best betting recommendations.
+    prompt = f"""Analyze the odds for these matches and provide your best betting recommendations.
 
 === AVAILABLE BETS ===
 {all_events_str}
 
-=== PRE-RESEARCHED INTELLIGENCE ===
-(This intelligence was gathered by a dedicated sourcing agent. Use it as the basis for your probability estimates — do NOT call any external tools.)
-{intelligence_block}
-
-CRITICAL REQUIREMENTS:
-1. Select between 1 and 3 bets (at least 1, up to 3) that offer the best value across ALL events provided.
-2. The total stake of all selected bets MUST NOT exceed ${budget:.2f}.
-3. Allocate the budget wisely among your selected bets based on confidence and value.
-4. Each selection MUST generate a profit of AT LEAST ${min_profit:.2f} (Profit = Stake * (Odds - 1)).
-5. **Mathematical Minimum Odds: {min_valid_odds:.2f}**. You CANNOT select any outcome with odds lower than this, as it is mathematically impossible to meet the minimum profit within your budget.
+CRITICAL RULES:
+1. Deduce the expected match dynamics purely from the odds structure.
+2. Select up to 3 bet recommendations that offer the best value-probability mix.
+3. Each chosen bet MUST generate a profit of AT LEAST ${min_profit:.2f}.
+4. Total stake across all bets MUST NOT exceed the budget of ${budget:.2f}.
+5. Allocate the budget wisely — stake more on shorter (safer) odds, less on longer odds.
 6. **NAMES — COPY VERBATIM, DO NOT INTERPRET:**
    You MUST use `event_name`, `market_name`, and `option_name` exactly as they appear above.
-   - "Tottenham v Arsenal" must stay "Tottenham v Arsenal" — NOT "Tottenham vs Arsenal"
-   - "OVER_UNDER_25" must stay "OVER_UNDER_25" — NOT "Over/Under 2.5"
-   - "Under 2.5 Goals" must stay "Under 2.5 Goals" — NOT "Under 2.5"
    Any mismatch will cause the bet to fail. Copy the string. Do not reformat it.
-{learnings_section}
 
 USER PREFERENCES (STRICTLY ADHERE TO THESE):
-- Risk Appetite: {risk_appetite}/5.0 -> Use Risk Level {risk_level} from your Handbook.
+- Risk Appetite: {risk_appetite}/5.0 -> Use Risk Level {risk_level} from your guidelines.
 - Budget: ${budget:.2f} (This is the TOTAL budget for all selected bets combined)
 - Minimum Profit Per Selection: ${min_profit:.2f}
-"""
+- Mathematical Minimum Odds: {min_valid_odds:.2f} (You CANNOT select odds lower than this)
+{f"""
+=== LEARNINGS FROM PREVIOUS BETS ===
+(These are lessons distilled from past results. Use them to avoid repeating mistakes and reinforce what has worked.)
+{learnings_section}
+""" if learnings_section else ""}"""
 
 
-def make_bet_selections(
-    events: List[Event],
-    intelligence_section: str,
-    budget: float,
-    min_profit: float,
-    risk_appetite: float,
-    wallet_service: WalletService,
-    bet_repo: BetRepository,
-    learnings_section: str = "",
-) -> BettingAgentResponse:
-    """
-    Build the decision prompt and run the betting agent in one step.
-
-    The manager calls this with the raw inputs; prompt construction
-    is an internal detail of the agent module.
-    """
-    prompt = _build_decision_prompt(
-        events=events,
-        intelligence_section=intelligence_section,
-        budget=budget,
-        min_profit=min_profit,
-        risk_appetite=risk_appetite,
-        learnings_section=learnings_section,
-    )
-    deps = AgentDeps(wallet_service=wallet_service, bet_repo=bet_repo)
+    deps = AgentDeps(wallet_service=wallet_service, bet_repo=bet_repo, betfair_service=betfair_service)
     result = betting_agent.run_sync(prompt, deps=deps)
-    return result.output
-
-
-def make_fallback_selections(
-    events: List[Event], 
-    budget: float, 
-    min_profit: float,
-    wallet_service: WalletService,
-    bet_repo: BetRepository,
-) -> BettingAgentResponse:
-    """
-    Build the prompt for the fallback agent and run it.
-    Only allows the fallback agent to see the specific goal markets it is allowed to bet on,
-    saving context and preventing hallucinations.
-    """
-    all_events_str = _format_events(events)
-
-    min_valid_odds = 1.0 + (min_profit / budget) if budget > 0 else 1.0
-
-    prompt = f"""Analyze the odds for these low-information matches.
-
-=== AVAILABLE FALLBACK BETS ===
-{all_events_str}
-
-CRITICAL RULES:
-1. Deduce the expected match volatility purely from the odds.
-2. Select EXACTLY ONE bet recommendation.
-3. The chosen bet MUST generate a profit of AT LEAST ${min_profit:.2f}.
-4. Utilize your allocated budget WISELY. You may stake up to the full budget of ${budget:.2f} depending on the safety (odds) of the selection.
-
-Budget: ${budget:.2f}
-Minimum Profit Required: ${min_profit:.2f}
-Mathematical Minimum Odds: {min_valid_odds:.2f} (You CANNOT select odds lower than this, as it is mathematically impossible to meet the profit target using your budget constraint).
-"""
-
-    from . import fallback_agent  # imported here to avoid circular dependencies if any
-    deps = AgentDeps(wallet_service=wallet_service, bet_repo=bet_repo)
-    result = fallback_agent.run_sync(prompt, deps=deps)
     return result.output

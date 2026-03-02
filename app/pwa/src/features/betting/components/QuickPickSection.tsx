@@ -1,16 +1,17 @@
-import { BetEvent, MarketOption, SelectionOption } from "@/shared/types";
+import { BetEvent, MarketOption, SelectionOption, BetSelectionItem } from "@/shared/types";
 import { cn } from "@/shared/utils";
 import { useState, useMemo } from "react";
-import { Minus, Plus, Lightbulb, Zap } from "lucide-react";
+import { Minus, Plus, Lightbulb, Zap, Sparkles, Check } from "lucide-react";
 
 interface QuickPickSectionProps {
     event: BetEvent;
     markets: MarketOption[];
     onSelection: (market: MarketOption, selection: SelectionOption) => void;
     isInSlip?: (marketId: string, selectionId: string | number) => boolean;
+    aiSelections?: BetSelectionItem[];
 }
 
-export function QuickPickSection({ event, markets, onSelection, isInSlip }: QuickPickSectionProps) {
+export function QuickPickSection({ event, markets, onSelection, isInSlip, aiSelections }: QuickPickSectionProps) {
     const [homeGoals, setHomeGoals] = useState<number>(0);
     const [awayGoals, setAwayGoals] = useState<number>(0);
 
@@ -121,9 +122,13 @@ export function QuickPickSection({ event, markets, onSelection, isInSlip }: Quic
                 <button
                     className={cn(
                         "relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all bg-white hover:shadow-xs",
-                        isSelected(matchOddsMarket?.market_id, homeWin?.selection_id)
+                        isSelected(matchOddsMarket?.market_id, homeWin?.selection_id) && !aiSelections?.some(s => s.market_id === matchOddsMarket?.market_id && String(s.selection_id) === String(homeWin?.selection_id) && s.source === 'ai')
                             ? "border-pink-500 ring-2 ring-pink-200 ring-offset-1"
-                            : "border-gray-100 hover:border-blue-200"
+                            : isSelected(matchOddsMarket?.market_id, homeWin?.selection_id) && aiSelections?.some(s => s.market_id === matchOddsMarket?.market_id && String(s.selection_id) === String(homeWin?.selection_id) && s.source === 'ai')
+                                ? "border-violet-400 bg-violet-50 ring-2 ring-violet-200 ring-offset-1"
+                                : aiSelections?.some(s => s.market_id === matchOddsMarket?.market_id && String(s.selection_id) === String(homeWin?.selection_id) && s.source === 'ai')
+                                    ? "border-violet-400 bg-violet-50 ring-1 ring-violet-200"
+                                    : "border-gray-100 hover:border-blue-200"
                     )}
                     onClick={() => handleSelectionClick(matchOddsMarket, homeWin)}
                     disabled={!homeWin}
@@ -132,20 +137,35 @@ export function QuickPickSection({ event, markets, onSelection, isInSlip }: Quic
                     <span className="text-2xl font-bold text-gray-900 mb-1">{homeWin?.odds?.toFixed(2) || '-'}</span>
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">WIN</span>
 
-                    {isSelected(matchOddsMarket?.market_id, homeWin?.selection_id) && (
+                    {isSelected(matchOddsMarket?.market_id, homeWin?.selection_id) && !aiSelections?.some(s => s.market_id === matchOddsMarket?.market_id && String(s.selection_id) === String(homeWin?.selection_id) && s.source === 'ai') && (
                         <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-pink-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-sm">
                             FAVORITED
                         </span>
                     )}
+                    {isSelected(matchOddsMarket?.market_id, homeWin?.selection_id) && aiSelections?.some(s => s.market_id === matchOddsMarket?.market_id && String(s.selection_id) === String(homeWin?.selection_id) && s.source === 'ai') && (
+                        <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-violet-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-sm flex items-center gap-0.5">
+                            <Check className="h-2.5 w-2.5" /> <Sparkles className="h-2.5 w-2.5" />
+                        </span>
+                    )}
+                    {!isSelected(matchOddsMarket?.market_id, homeWin?.selection_id) &&
+                        aiSelections?.some(s => s.market_id === matchOddsMarket?.market_id && String(s.selection_id) === String(homeWin?.selection_id) && s.source === 'ai') && (
+                            <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-violet-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-sm flex items-center gap-0.5">
+                                <Sparkles className="h-2.5 w-2.5" />AI
+                            </span>
+                        )}
                 </button>
 
                 {/* Draw */}
                 <button
                     className={cn(
                         "relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all bg-white shadow-sm hover:shadow-md",
-                        isSelected(matchOddsMarket?.market_id, draw?.selection_id)
+                        isSelected(matchOddsMarket?.market_id, draw?.selection_id) && !aiSelections?.some(s => s.market_id === matchOddsMarket?.market_id && String(s.selection_id) === String(draw?.selection_id) && s.source === 'ai')
                             ? "border-pink-500 ring-2 ring-pink-200 ring-offset-1"
-                            : "border-gray-100 hover:border-blue-200"
+                            : isSelected(matchOddsMarket?.market_id, draw?.selection_id) && aiSelections?.some(s => s.market_id === matchOddsMarket?.market_id && String(s.selection_id) === String(draw?.selection_id) && s.source === 'ai')
+                                ? "border-violet-400 bg-violet-50 ring-2 ring-violet-200 ring-offset-1"
+                                : aiSelections?.some(s => s.market_id === matchOddsMarket?.market_id && String(s.selection_id) === String(draw?.selection_id) && s.source === 'ai')
+                                    ? "border-violet-400 bg-violet-50 ring-1 ring-violet-200"
+                                    : "border-gray-100 hover:border-blue-200"
                     )}
                     onClick={() => handleSelectionClick(matchOddsMarket, draw)}
                     disabled={!draw}
@@ -153,20 +173,35 @@ export function QuickPickSection({ event, markets, onSelection, isInSlip }: Quic
                     <span className="text-xs font-bold text-gray-700 mb-1">Draw</span>
                     <span className="text-2xl font-bold text-gray-900 mb-1">{draw?.odds?.toFixed(2) || '-'}</span>
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">TIE</span>
-                    {isSelected(matchOddsMarket?.market_id, draw?.selection_id) && (
+                    {isSelected(matchOddsMarket?.market_id, draw?.selection_id) && !aiSelections?.some(s => s.market_id === matchOddsMarket?.market_id && String(s.selection_id) === String(draw?.selection_id) && s.source === 'ai') && (
                         <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-pink-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-sm">
                             FAVORITED
                         </span>
                     )}
+                    {isSelected(matchOddsMarket?.market_id, draw?.selection_id) && aiSelections?.some(s => s.market_id === matchOddsMarket?.market_id && String(s.selection_id) === String(draw?.selection_id) && s.source === 'ai') && (
+                        <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-violet-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-sm flex items-center gap-0.5">
+                            <Check className="h-2.5 w-2.5" /> <Sparkles className="h-2.5 w-2.5" />
+                        </span>
+                    )}
+                    {!isSelected(matchOddsMarket?.market_id, draw?.selection_id) &&
+                        aiSelections?.some(s => s.market_id === matchOddsMarket?.market_id && String(s.selection_id) === String(draw?.selection_id) && s.source === 'ai') && (
+                            <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-violet-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-sm flex items-center gap-0.5">
+                                <Sparkles className="h-2.5 w-2.5" />AI
+                            </span>
+                        )}
                 </button>
 
                 {/* Away Win */}
                 <button
                     className={cn(
                         "relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all bg-white shadow-sm hover:shadow-md",
-                        isSelected(matchOddsMarket?.market_id, awayWin?.selection_id)
+                        isSelected(matchOddsMarket?.market_id, awayWin?.selection_id) && !aiSelections?.some(s => s.market_id === matchOddsMarket?.market_id && String(s.selection_id) === String(awayWin?.selection_id) && s.source === 'ai')
                             ? "border-pink-500 ring-2 ring-pink-200 ring-offset-1"
-                            : "border-gray-100 hover:border-blue-200"
+                            : isSelected(matchOddsMarket?.market_id, awayWin?.selection_id) && aiSelections?.some(s => s.market_id === matchOddsMarket?.market_id && String(s.selection_id) === String(awayWin?.selection_id) && s.source === 'ai')
+                                ? "border-violet-400 bg-violet-50 ring-2 ring-violet-200 ring-offset-1"
+                                : aiSelections?.some(s => s.market_id === matchOddsMarket?.market_id && String(s.selection_id) === String(awayWin?.selection_id) && s.source === 'ai')
+                                    ? "border-violet-400 bg-violet-50 ring-1 ring-violet-200"
+                                    : "border-gray-100 hover:border-blue-200"
                     )}
                     onClick={() => handleSelectionClick(matchOddsMarket, awayWin)}
                     disabled={!awayWin}
@@ -174,11 +209,22 @@ export function QuickPickSection({ event, markets, onSelection, isInSlip }: Quic
                     <span className="text-xs font-bold text-gray-700 mb-1 truncate w-full text-center">{teams.away}</span>
                     <span className="text-2xl font-bold text-gray-900 mb-1">{awayWin?.odds?.toFixed(2) || '-'}</span>
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">WIN</span>
-                    {isSelected(matchOddsMarket?.market_id, awayWin?.selection_id) && (
+                    {isSelected(matchOddsMarket?.market_id, awayWin?.selection_id) && !aiSelections?.some(s => s.market_id === matchOddsMarket?.market_id && String(s.selection_id) === String(awayWin?.selection_id) && s.source === 'ai') && (
                         <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-pink-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-sm">
                             FAVORITED
                         </span>
                     )}
+                    {isSelected(matchOddsMarket?.market_id, awayWin?.selection_id) && aiSelections?.some(s => s.market_id === matchOddsMarket?.market_id && String(s.selection_id) === String(awayWin?.selection_id) && s.source === 'ai') && (
+                        <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-violet-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-sm flex items-center gap-0.5">
+                            <Check className="h-2.5 w-2.5" /> <Sparkles className="h-2.5 w-2.5" />
+                        </span>
+                    )}
+                    {!isSelected(matchOddsMarket?.market_id, awayWin?.selection_id) &&
+                        aiSelections?.some(s => s.market_id === matchOddsMarket?.market_id && String(s.selection_id) === String(awayWin?.selection_id) && s.source === 'ai') && (
+                            <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-violet-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-sm flex items-center gap-0.5">
+                                <Sparkles className="h-2.5 w-2.5" />AI
+                            </span>
+                        )}
                 </button>
             </div>
 

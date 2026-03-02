@@ -27,7 +27,7 @@ from core.modules.betting.models import (
     PlaceBetRequest,
 )
 from core.modules.betting.repository import BetRepository
-from core.modules.betting.suggestion_repository import SuggestionRepository
+from core.modules.betting.daily_fixtures_repository import DailyFixturesRepository
 from core.modules.betting.betfair_service import BetfairService
 from core.modules.settings.manager import SettingsManager
 from core.modules.learnings.manager import LearningsManager
@@ -48,14 +48,14 @@ class BettingManager:
         betfair_service=None,
         bet_repo=None,
         settings_manager=None,
-        suggestion_repo=None,
+        daily_fixtures_repo=None,
         learnings_manager=None,
         wallet_service=None,
     ):
         betfair = betfair_service or BetfairService()
         repo = bet_repo or BetRepository()
         settings = settings_manager or SettingsManager()
-        suggestion_repository = suggestion_repo or SuggestionRepository()
+        daily_fixtures = daily_fixtures_repo or DailyFixturesRepository()
         learnings = learnings_manager or LearningsManager()
         wallet = wallet_service or WalletService()
 
@@ -64,6 +64,7 @@ class BettingManager:
             learnings_manager=learnings,
             wallet_service=wallet,
             bet_repo=repo,
+            betfair_service=betfair,
         )
         self._placement = BetPlacementService(
             betfair_service=betfair,
@@ -80,26 +81,25 @@ class BettingManager:
         self._automation = AutomatedBettingService(
             betfair_service=betfair,
             bet_repo=repo,
-            suggestion_repo=suggestion_repository,
+            daily_fixtures_repo=daily_fixtures,
             settings_manager=settings,
             wallet_service=wallet,
             analysis_service=self._analysis,
+            placement_service=self._placement,
         )
+
 
         # Keep direct repo/betfair references for lightweight query methods below.
         self.betfair = betfair
         self.repo = repo
         self.settings_manager = settings
-        self._suggestion_repo_instance = suggestion_repository
+        self._daily_fixtures_repo_instance = daily_fixtures
         self._learnings_manager_instance = learnings
         self._wallet_service_instance = wallet
 
     # ------------------------------------------------------------------
     # Lightweight accessors (kept here to avoid import changes in main.py)
     # ------------------------------------------------------------------
-
-    def get_suggestion_repo(self) -> SuggestionRepository:
-        return self._suggestion_repo_instance
 
     def get_learnings_manager(self) -> LearningsManager:
         return self._learnings_manager_instance
@@ -108,8 +108,7 @@ class BettingManager:
         return self._wallet_service_instance
 
     # ------------------------------------------------------------------
-    # Shared utility (used by main.py triggers via update_analysis_result,
-    # update_suggestion_analysis)
+    # Shared utility (used by main.py triggers via update_analysis_result)
     # ------------------------------------------------------------------
 
     @staticmethod
@@ -149,6 +148,29 @@ class BettingManager:
     # Automation
     # ------------------------------------------------------------------
 
+    def fetch_and_store_daily_fixtures(
+        self,
+        target_date: Optional[str] = None,
+    ):
+        """
+        Fetches all upcoming games for the target date (or today if None)
+        and persists them into the DailyFixtures subcollection.
+
+        Args:
+            target_date: ISO date string (YYYY-MM-DD). Defaults to today UTC.
+        """
+        date_str = target_date or datetime.now(timezone.utc).date().isoformat()
+
+        games = self.get_all_upcoming_games(date=date_str, competitions=[], max_results=10000)
+
+        if games:
+            count = self._daily_fixtures_repo_instance.batch_save_fixtures(date_str, games)
+            logger.info(f"Successfully stored {count} daily fixtures for {date_str}.")
+            return {"status": "success", "count": count, "date": date_str}
+
+        logger.warning(f"No fixtures found for {date_str}.")
+        return {"status": "success", "count": 0, "date": date_str}
+
     def execute_automated_betting(
         self,
         competitions: List[str],
@@ -179,8 +201,6 @@ class BettingManager:
             risk_appetite=risk_appetite,
         )
 
-    def promote_suggestions_to_bets(self) -> Dict[str, Any]:
-        return self._automation.promote_suggestions_to_bets()
 
     # ------------------------------------------------------------------
     # Placement
@@ -217,21 +237,38 @@ class BettingManager:
         sport: Optional[str] = None,
         date: Optional[str] = None,
         competitions: Optional[List[str]] = None,
+        max_results: int = 200,
     ) -> List[Dict[str, Any]]:
-        competitions = competitions or RELIABLE_COMPETITIONS
+        from constants import RELIABLE_ALL_TEAMS
+        # competitions=None means "all competitions" (no filter).
+        # Callers that want to restrict pass an explicit list.
         logger.info(
-            f"Fetching upcoming games for competitions: {competitions}"
+            f"Fetching upcoming games for competitions: {competitions or 'ALL'}"
             + (f" on date: {date}" if date else "")
         )
         try:
             games = self.betfair.search_market(
-                sport=sport, competitions=competitions, date=date
+                sport=sport, competitions=competitions, date=date, max_results=max_results
             )
             games.sort(key=lambda x: x["time"])
+
+            reliable_set = {t.lower() for t in RELIABLE_ALL_TEAMS}
+            for game in games:
+                name: str = game.get("name", "")
+                # Events are formatted as "Home v Away"
+                parts = [p.strip().lower() for p in name.replace(" vs ", " v ").split(" v ")]
+                game["has_reliable_team"] = any(p in reliable_set for p in parts)
+                
+                # Check if the competition is reliable
+                comp = game.get("competition", {})
+                comp_name = comp.get("name") if isinstance(comp, dict) else comp
+                game["is_reliable_competition"] = comp_name in RELIABLE_COMPETITIONS if comp_name else False
+
             return games
         except Exception as e:
             logger.error(f"Error fetching upcoming games: {e}", exc_info=True)
             return []
+
 
     def get_odds(self, request: GetOddsRequest) -> Dict[str, Any]:
         return self.betfair.search_market(

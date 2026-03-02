@@ -36,5 +36,8 @@ class BetfairService:
     def get_balance(self) -> Dict[str, Any]:
         return self.client.get_balance()
 
+    def get_market_liquidity(self, market_id: str, selection_id: int) -> float:
+        return self.client.get_market_liquidity(market_id, selection_id)
+
     def list_cleared_orders(self, *args, **kwargs) -> List[Dict[str, Any]]:
         return self.client.list_cleared_orders(*args, **kwargs)

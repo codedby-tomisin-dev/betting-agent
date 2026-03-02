@@ -56,9 +56,13 @@ class MatchIntelligenceReport(BaseModel):
 class BettingAgentResponse(BaseModel):
     class BetRecommendation(BaseModel):
         class Pick(BaseModel):
-            event_name: str = Field(..., description="Name of the event/match")
-            market_name: str = Field(..., description="Name of the market type")
-            option_name: str = Field(..., description="Name of the selection/option being bet on")
+            """Identifiers the AI must output. Names are resolved by the backend from the events list."""
+            market_id: str = Field(..., description="Exact market_id string from the input data")
+            selection_id: int = Field(..., description="Exact selection_id integer from the input data")
+            # Resolved by the backend — AI must NOT output these, they are populated from the events list.
+            event_name: str = Field(default="", description="Resolved by backend from events list")
+            market_name: str = Field(default="", description="Resolved by backend from events list")
+            option_name: str = Field(default="", description="Resolved by backend from events list")
         
         pick: Pick
         market_id: str

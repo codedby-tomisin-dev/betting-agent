@@ -5,6 +5,7 @@ import { BetSelectionItem } from "@/shared/types";
 
 export interface BetSlipSelection extends BetSelectionItem {
     id: string; // Unique identifier for each selection in the slip
+    recommended_stake?: number; // AI-suggested stake, preserved for auto-fill
 }
 
 interface BetSlipContextType {
@@ -14,6 +15,8 @@ interface BetSlipContextType {
     removeByMarket: (marketId: string, selectionId: string | number) => void;
     toggleSelection: (selection: Omit<BetSlipSelection, 'id'>) => void;
     updateStake: (id: string, stake: number) => void;
+    fillRecommendedStakes: () => void;
+    hasRecommendedStakes: boolean;
     clearSlip: () => void;
     isInSlip: (marketId: string, selectionId: string | number) => boolean;
     totalStake: number;
@@ -94,6 +97,15 @@ export function BetSlipProvider({ children }: { children: ReactNode }) {
         setSelections([]);
     }, []);
 
+    /** Snap every stake to its AI-recommended value (if one exists). */
+    const fillRecommendedStakes = useCallback(() => {
+        setSelections(prev => prev.map(s =>
+            s.recommended_stake ? { ...s, stake: s.recommended_stake } : s
+        ));
+    }, []);
+
+    const hasRecommendedStakes = selections.some(s => (s.recommended_stake ?? 0) > 0);
+
     const isInSlip = useCallback((marketId: string, selectionId: string | number) => {
         return selections.some(s => s.market_id === marketId && s.selection_id === selectionId);
     }, [selections]);
@@ -109,6 +121,8 @@ export function BetSlipProvider({ children }: { children: ReactNode }) {
             removeByMarket,
             toggleSelection,
             updateStake,
+            fillRecommendedStakes,
+            hasRecommendedStakes,
             clearSlip,
             isInSlip,
             totalStake,

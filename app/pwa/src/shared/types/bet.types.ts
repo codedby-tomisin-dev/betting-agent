@@ -55,6 +55,24 @@ export interface MarketOption {
 export interface BetEvent extends EventInfo {
     provider_event_id?: string;
     options?: MarketOption[];
+    has_reliable_team?: boolean;
+}
+
+/**
+ * Daily Fixture returned from the real-time subcollection
+ */
+export interface DailyFixture {
+    id: string; // provider_event_id
+    event: BetEvent;
+    analysis_status: 'pending' | 'completed' | 'failed';
+    analysis_error?: string;
+    selections?: BetSelectionItem[];
+    metadata?: {
+        marketCount?: number;
+        is_reliable_competition?: boolean;
+        is_reliable_team?: boolean;
+    };
+    status?: string; // e.g. 'placed'
 }
 
 /**
@@ -71,6 +89,7 @@ export interface BetSelectionItem {
     selection_id?: string | number;
     side?: string;
     reasoning?: string;
+    source?: "ai" | "user";
 }
 
 /**

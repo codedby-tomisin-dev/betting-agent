@@ -72,12 +72,6 @@ def mock_betting_repo():
     return mock_repo
 
 
-@pytest.fixture
-def mock_suggestion_repo():
-    """Mock SuggestionRepository."""
-    mock_repo = MagicMock()
-    mock_repo.create_suggestion.return_value = {"id": "suggestion_123", "status": "intent"}
-    return mock_repo
 
 
 @pytest.fixture
@@ -106,7 +100,7 @@ def mock_wallet_repo():
 
 
 @pytest.fixture
-def betting_manager(mock_betfair_client, mock_betting_repo, mock_suggestion_repo,
+def betting_manager(mock_betfair_client, mock_betting_repo,
                     mock_settings_repo, mock_learnings_repo, mock_wallet_repo):
     """Create a BettingManager with all dependencies injected — no Firebase required."""
     from core.modules.betting.manager import BettingManager
@@ -134,7 +128,6 @@ def betting_manager(mock_betfair_client, mock_betting_repo, mock_suggestion_repo
     return BettingManager(
         betfair_service=mock_betfair_service,
         bet_repo=mock_betting_repo,
-        suggestion_repo=mock_suggestion_repo,
         settings_manager=settings_manager,
         learnings_manager=learnings_manager,
         wallet_service=wallet_service,

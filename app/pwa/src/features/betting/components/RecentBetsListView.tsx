@@ -20,7 +20,9 @@ export function RecentBetsListView({ bets }: RecentBetsListViewProps) {
 
     const { recentBets } = useMemo(() => {
         const sorted = bets
-            .filter(b => b.status !== "intent")
+            // Exclude unapproved AI picks — they live in bet_slips as intents
+            // but should never appear in the Recent Activity panel.
+            .filter(b => b.status !== "intent" && b.status !== "ready" && b.status !== "analyzed")
             .sort((a, b) => {
                 const dateA = new Date(a.created_at as Date).getTime();
                 const dateB = new Date(b.created_at as Date).getTime();

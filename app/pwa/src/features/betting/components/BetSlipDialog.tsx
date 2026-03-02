@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useBetSlip } from "../context/BetSlipContext";
 import { formatCurrency } from "@/shared/utils";
-import { X, Trash2, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { X, Trash2, Loader2, CheckCircle, AlertCircle, Wand2 } from "lucide-react";
 import { formatTimestamp } from "../utils/formatBetMetadata";
 import { SelectionReasoning } from "./SelectionReasoning";
 import { PlaceBetOrder } from "@/shared/api/bettingApi";
@@ -28,7 +28,7 @@ interface BetSlipDialogProps {
 }
 
 export function BetSlipDialog({ isOpen, onClose, onPlaceBets }: BetSlipDialogProps) {
-    const { selections, removeSelection, updateStake, clearSlip, totalStake, totalReturns } = useBetSlip();
+    const { selections, removeSelection, updateStake, clearSlip, totalStake, totalReturns, fillRecommendedStakes, hasRecommendedStakes } = useBetSlip();
     const [isPlacing, setIsPlacing] = useState(false);
     const [placementResult, setPlacementResult] = useState<{ success: boolean; message: string } | null>(null);
 
@@ -124,17 +124,31 @@ export function BetSlipDialog({ isOpen, onClose, onPlaceBets }: BetSlipDialogPro
                 <DialogHeader className="flex-shrink-0">
                     <div className="flex items-center justify-between">
                         <DialogTitle>Bet Slip ({selections.length})</DialogTitle>
-                        {selections.length > 0 && !isPlacing && (
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                                onClick={clearSlip}
-                            >
-                                <Trash2 className="h-4 w-4 mr-1" />
-                                Clear All
-                            </Button>
-                        )}
+                        <div className="flex items-center gap-2">
+                            {hasRecommendedStakes && !isPlacing && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-amber-600 border-amber-200 hover:bg-amber-50 hover:text-amber-700"
+                                    onClick={fillRecommendedStakes}
+                                    title="Fill all stakes with AI-recommended amounts"
+                                >
+                                    <Wand2 className="h-3.5 w-3.5 mr-1.5" />
+                                    Use AI Amounts
+                                </Button>
+                            )}
+                            {selections.length > 0 && !isPlacing && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                                    onClick={clearSlip}
+                                >
+                                    <Trash2 className="h-4 w-4 mr-1" />
+                                    Clear All
+                                </Button>
+                            )}
+                        </div>
                     </div>
                 </DialogHeader>
 

@@ -4,9 +4,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BetEvent, MarketOption, SelectionOption, AIAnalysisResponse, BetSelectionItem } from "@/shared/types";
-import { Check, ChevronDown, ChevronUp } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
 import { cn } from "@/shared/utils";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { AIContext } from "./AIContext";
 import { QuickPickSection } from "./QuickPickSection";
 import { analyzeSingleGame } from "@/shared/api/bettingApi";
@@ -19,7 +19,9 @@ interface MarketOptionsDialogProps {
     readonly isOpen: boolean;
     readonly onClose: () => void;
     readonly onSelectSelection?: (event: BetEvent, market: MarketOption, selection: SelectionOption) => void;
+    readonly onToggleAISelection?: (item: BetSelectionItem) => void;
     readonly isInSlip?: (marketId: string, selectionId: string | number) => boolean;
+    readonly aiSelections?: BetSelectionItem[];
 }
 
 export function MarketOptionsDialog({
@@ -27,7 +29,9 @@ export function MarketOptionsDialog({
     isOpen,
     onClose,
     onSelectSelection,
-    isInSlip
+    onToggleAISelection,
+    isInSlip,
+    aiSelections,
 }: MarketOptionsDialogProps) {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [analysis, setAnalysis] = useState<AIAnalysisResponse | null>(null);
@@ -38,10 +42,13 @@ export function MarketOptionsDialog({
         new Set(['Match Odds', 'Goals'])
     );
 
+    const hasFetchedMarkets = useRef(false);
+
     // Fetch all markets when dialog opens if provider_event_id is available
     useEffect(() => {
-        if (isOpen && event.provider_event_id) {
+        if (isOpen && event.provider_event_id && !hasFetchedMarkets.current) {
             const fetchMarkets = async () => {
+                hasFetchedMarkets.current = true;
                 try {
                     setIsLoadingMarkets(true);
                     const { fetchEventMarkets } = await import("@/shared/api/bettingApi");
@@ -60,11 +67,12 @@ export function MarketOptionsDialog({
                 }
             };
             fetchMarkets();
-        } else if (isOpen) {
+        } else if (isOpen && !event.provider_event_id && !hasFetchedMarkets.current) {
             // No provider_event_id, use existing markets
+            hasFetchedMarkets.current = true;
             setAllMarkets(event.options || []);
         }
-    }, [isOpen, event.provider_event_id, event.options]);
+    }, [isOpen, event.provider_event_id]); // Removed event.options to prevent full refresh on selection toggle
 
     // Reset analysis when dialog opens/closes
     useEffect(() => {
@@ -72,6 +80,7 @@ export function MarketOptionsDialog({
             setAnalysis(null);
             setIsAnalyzing(false);
             setAllMarkets([]);
+            hasFetchedMarkets.current = false;
         }
     }, [isOpen]);
 
@@ -96,7 +105,11 @@ export function MarketOptionsDialog({
     };
 
     const handleToggleFromAI = (item: BetSelectionItem) => {
-        toggleSelection(item);
+        if (onToggleAISelection) {
+            onToggleAISelection(item);
+        } else {
+            toggleSelection(item);
+        }
     };
 
     const handleQuickSelection = (market: MarketOption, selection: SelectionOption) => {
@@ -120,11 +133,13 @@ export function MarketOptionsDialog({
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-h-[85vh] flex flex-col max-w-md p-0 gap-0 overflow-hidden bg-white">
-                <DialogHeader className="px-6 pt-6 pb-2 border-b border-gray-50">
-                    <DialogTitle>{event.name}</DialogTitle>
-                    <p className="text-xs text-gray-500">
-                        {event.competition?.name} • {event.time ? new Date(event.time).toLocaleString() : 'TBD'}
-                    </p>
+                <DialogHeader className="px-6 pt-6 pb-2 border-b border-gray-50 flex flex-row items-start justify-between">
+                    <div>
+                        <DialogTitle>{event.name}</DialogTitle>
+                        <p className="text-xs text-gray-500 mt-1">
+                            {event.competition?.name} • {event.time ? new Date(event.time).toLocaleString() : 'TBD'}
+                        </p>
+                    </div>
                 </DialogHeader>
 
                 <Tabs defaultValue="quick-pick" className="flex-1 flex flex-col overflow-hidden">
@@ -141,6 +156,7 @@ export function MarketOptionsDialog({
                             markets={allMarkets}
                             onSelection={handleQuickSelection}
                             isInSlip={isInSlip}
+                            aiSelections={aiSelections}
                         />
 
                         {/* AI Analysis - kept inside Quick Pick for context */}
@@ -196,15 +212,26 @@ export function MarketOptionsDialog({
                                                         <div className="grid grid-cols-2 gap-2">
                                                             {option.options?.map((selection) => {
                                                                 const inSlip = isInSlip?.(option.market_id || '', selection.selection_id || '');
+                                                                const isAIPick = aiSelections?.some(
+                                                                    s => s.market_id === option.market_id && String(s.selection_id) === String(selection.selection_id) && s.source === 'ai'
+                                                                );
+
+                                                                // If it's an AI pick and in the slip, we style it like an AI pick.
+                                                                // If it's a user pick and in the slip, we style it like a user pick.
+                                                                const isSelectedAIPick = inSlip && isAIPick;
+                                                                const isSelectedUserPick = inSlip && !isAIPick;
+
                                                                 return (
                                                                     <Button
                                                                         key={`${option.market_id}-${selection.selection_id}`}
                                                                         variant="outline"
                                                                         className={cn(
                                                                             "justify-between h-auto py-3 px-3 border-gray-200 bg-white shadow-sm",
-                                                                            inSlip
+                                                                            isSelectedUserPick
                                                                                 ? "bg-pink-50 border-pink-300 text-pink-700 hover:bg-pink-100 hover:border-pink-400"
-                                                                                : "hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600"
+                                                                                : isSelectedAIPick || isAIPick
+                                                                                    ? "border-violet-300 bg-violet-50 hover:border-violet-400 hover:bg-violet-100"
+                                                                                    : "hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600"
                                                                         )}
                                                                         size="sm"
                                                                         onClick={() => {
@@ -214,12 +241,14 @@ export function MarketOptionsDialog({
                                                                         }}
                                                                     >
                                                                         <span className="flex items-center gap-1.5 overflow-hidden">
-                                                                            {inSlip && <Check className="h-3 w-3 text-pink-600 shrink-0" />}
+                                                                            {isSelectedUserPick && <Check className="h-3 w-3 text-pink-600 shrink-0" />}
+                                                                            {(isSelectedAIPick || isAIPick) && <Sparkles className="h-3 w-3 text-violet-500 shrink-0" />}
+                                                                            {isSelectedAIPick && <Check className="h-3 w-3 text-violet-600 shrink-0" />}
                                                                             <span className="text-xs font-medium truncate" title={selection.name}>{selection.name}</span>
                                                                         </span>
                                                                         <span className={cn(
                                                                             "font-bold text-xs ml-2",
-                                                                            inSlip ? "text-pink-600" : "text-blue-600"
+                                                                            isSelectedUserPick ? "text-pink-600" : (isSelectedAIPick || isAIPick) ? "text-violet-600" : "text-blue-600"
                                                                         )}>{selection.odds}</span>
                                                                     </Button>
                                                                 );

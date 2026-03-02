@@ -29,18 +29,13 @@ def test_get_bet_returns_data(betting_manager):
     betting_manager.repo.get_bet.assert_called_once_with("test_bet_123")
 
 
-def test_execute_automated_betting_creates_suggestion(betting_manager, sample_event):
-    """Test execute_automated_betting proceeds to create a suggestion."""
+
+def test_execute_automated_betting_returns_intent(betting_manager, sample_event):
+    """Test execute_automated_betting returns a valid intent dict directly (no suggestion repo)."""
     target_date = "2025-01-01"
-
     betting_manager.repo.get_matches_by_date.return_value = []
-
-    # sample_event uses new schema field 'time'
     sample_event_with_date = {**sample_event, "time": "2025-01-01T15:00:00Z"}
-    betting_manager.get_odds = MagicMock(return_value=[sample_event_with_date])
-
-    mock_suggestion = {"id": "new_suggestion_123", "status": "intent"}
-    betting_manager._suggestion_repo.create_suggestion.return_value = mock_suggestion
+    betting_manager.betfair.search_market = MagicMock(return_value=[sample_event_with_date])
 
     result = betting_manager.execute_automated_betting(
         competitions=["Test Comp"],
@@ -50,37 +45,12 @@ def test_execute_automated_betting_creates_suggestion(betting_manager, sample_ev
         target_date=target_date
     )
 
-    assert result["id"] == "new_suggestion_123"
-
-
-def test_intent_creation_structure(betting_manager, sample_event):
-    """Test that balance is correctly structured in the created suggestion."""
-    betting_manager.repo.get_matches_by_date.return_value = []
-
-    sample_event_with_date = {**sample_event, "time": "2025-01-01T15:00:00Z"}
-    betting_manager.get_odds = MagicMock(return_value=[sample_event_with_date])
-
-    betting_manager._suggestion_repo.create_suggestion.return_value = {"id": "sug_123"}
-
-    betting_manager.execute_automated_betting(
-        competitions=["Test Comp"],
-        bankroll_percent=10,
-        max_bankroll=10,
-        risk_appetite=3,
-        target_date="2025-01-01"
-    )
-
-    mock_create = betting_manager._suggestion_repo.create_suggestion
-    call_args = mock_create.call_args
-    assert call_args is not None
-    intent_data = call_args[0][0]
-
-    assert "balance" in intent_data
-    assert "starting" in intent_data["balance"]
-    assert "predicted" in intent_data["balance"]
-    assert "ending" in intent_data["balance"]
-    assert isinstance(intent_data["balance"]["starting"], (int, float))
-    assert intent_data["balance"]["ending"] is None
+    assert "balance" in result
+    assert "starting" in result["balance"]
+    assert "predicted" in result["balance"]
+    assert "ending" in result["balance"]
+    assert isinstance(result["balance"]["starting"], (int, float))
+    assert result["balance"]["ending"] is None
 
 
 def test_get_balance(betting_manager):
@@ -164,9 +134,15 @@ def test_analyze_betting_opportunities(betting_manager, sample_event):
     mock_response.recommendations = [mock_rec]
     mock_response.overall_reasoning = "Test overall reasoning"
 
-    with patch('core.modules.betting.manager.gather_intelligence', return_value="mock intelligence"), \
-         patch('core.modules.betting.manager.make_bet_selections', return_value=mock_response):
-        result = betting_manager.analyze_betting_opportunities(data)
+    # We mock the analysis_service that handles the work
+    betting_manager._analysis.analyze_betting_opportunities = MagicMock(return_value={
+        "selections": {
+            "items": [{"stake": 10.0, "odds": 2.5, "market_id": "1.123"}],
+            "wager": {"stake": 10.0, "odds": 2.5, "potential_returns": 25.0}
+        }
+    })
+
+    result = betting_manager.analyze_betting_opportunities(data)
 
     assert "selections" in result
     assert "items" in result["selections"]

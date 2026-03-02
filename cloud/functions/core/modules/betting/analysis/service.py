@@ -1,222 +1,122 @@
 import math
-import random
 from typing import Dict, Any, List
 
 from core import logger
 from core.modules.betting.agent.service import make_bet_selections
-from core.modules.betting.sourcing.service import gather_intelligence
 from core.modules.betting.models import AnalyzeBetsRequest, BettingAgentResponse
 from core.modules.settings.manager import SettingsManager
 from core.modules.learnings.manager import LearningsManager
 from core.modules.wallet.service import WalletService
 from core.modules.betting.repository import BetRepository
-from constants import RELIABLE_ALL_TEAMS, RELIABLE_COMPETITIONS
 from third_party.betting_platforms.models import Event
+from core.modules.betting.betfair_service import BetfairService
 
 
 class BettingAnalysisService:
-    """Handles AI-driven betting analysis: event routing, intelligence sourcing, and decision making."""
+    """Handles AI-driven betting analysis: passes events to the odds-analysis agent."""
 
     def __init__(
-        self, 
-        settings_manager: SettingsManager, 
+        self,
+        settings_manager: SettingsManager,
         learnings_manager: LearningsManager,
         wallet_service: WalletService = None,
-        bet_repo: BetRepository = None
+        bet_repo: BetRepository = None,
+        betfair_service: BetfairService = None
     ):
         self.settings_manager = settings_manager
         self.learnings_manager = learnings_manager
         self.wallet_service = wallet_service or WalletService()
         self.bet_repo = bet_repo or BetRepository()
+        self.betfair_service = betfair_service or BetfairService()
 
     def _is_valid_bet(self, stake: float, odds: float) -> bool:
         """Return True if a bet meets the minimum stake and profit requirements."""
         settings = self.settings_manager.get_betting_settings()
         return stake >= settings.min_stake and stake * (odds - 1) >= settings.min_profit
 
-    def _partition_events(
-        self, events: List[Event]
-    ) -> tuple[List[Event], List[Event]]:
-        """Split events into reliable (AI pipeline) and unreliable (scripted fallback)."""
-        reliable, unreliable = [], []
-        for event in events:
-            is_reliable = event.competition_name in RELIABLE_COMPETITIONS or any(
-                team in event.event_name for team in RELIABLE_ALL_TEAMS
-            )
-            (reliable if is_reliable else unreliable).append(event)
-        return reliable, unreliable
-
-    def _select_fallback_event(
-        self, reliable: List[Event], unreliable: List[Event]
-    ) -> List[Event]:
-        """
-        When no reliable events are found, fall back to one randomly selected
-        unreliable event rather than skipping entirely.
-        """
-        if reliable or not unreliable:
-            return unreliable  # use all unreliable events for scripted fallbacks as normal
-
-        chosen = random.choice(unreliable)
-        logger.info(
-            f"No reliable events found. Randomly selected '{chosen.event_name}' "
-            "from unreliable pool as sole fallback."
-        )
-        return [chosen]
-
-    def _filter_fallback_markets(self, events: List[Event]) -> List[Event]:
-        """
-        Create copies of events containing only the safe goal ceiling markets
-        to prevent the fallback agent from getting confused by or selecting
-        unsupported markets like Match Odds.
-        """
-        allowed_markets = [
-            "Over 0.5 Goals", "Over 1.5 Goals", "Under 4.5 Goals", "Under 5.5 Goals", "Under 6.5 Goals",
-            "Yes", "No", # Both teams to score
-            "Home", "Away", "The Draw", # Match odds
-            "Home or Draw", "Draw or Away", "Home or Away", # Double chance
-            "Match Odds", "Double Chance", "Both teams to Score" # In case market name is matched
-        ]
-        filtered_events = []
-        for event in events:
-            # Create a shallow copy of the event to avoid mutating the original request
-            from copy import copy
-            filtered_event = copy(event)
-            filtered_options = []
-            for market in event.options:
-                filtered_market = copy(market)
-                filtered_market.options = [opt for opt in market.options if opt.name in allowed_markets]
-                if filtered_market.options:
-                    filtered_options.append(filtered_market)
-            filtered_event.options = filtered_options
-            if filtered_options:
-                filtered_events.append(filtered_event)
-        return filtered_events
-
     def analyze_betting_opportunities(self, request: AnalyzeBetsRequest) -> Dict[str, Any]:
         """
-        Analyze betting opportunities using AI agents with web research.
+        Analyze betting opportunities using the odds-analysis agent.
 
-        Routing rules:
-        - Reliable events  → full AI sourcing + decision pipeline.
-        - Unreliable events → Fallback AI (odds-based deduction on safe goal-ceilings).
-        - If *no* reliable events exist → one random unreliable event gets the fallback.
+        All events are passed directly to the agent which deduces match
+        dynamics purely from the market odds — no web research performed.
 
         Returns a dict with keys: total_stake, total_returns, selections, overall_reasoning.
         """
-        from core.modules.betting.agent.service import make_fallback_selections
-
         try:
             events = [Event(**event) for event in request.events]
         except Exception as e:
             logger.error(f"Failed to parse events: {e}")
             raise ValueError(f"Invalid event data: {str(e)}")
 
+        logger.info(f"Routing {len(events)} events to odds-analysis agent.")
+
+        learnings_section = ""
         try:
-            learnings_markdown = self.learnings_manager.get_current_learnings()
+            learnings_section = self.learnings_manager.get_current_learnings()
+            if learnings_section:
+                logger.info("Learnings fetched successfully — injecting into agent prompt.")
+            else:
+                logger.info("No learnings available — proceeding without them.")
         except Exception as e:
-            logger.error(f"Failed to fetch learnings: {e}")
-            learnings_markdown = ""
+            logger.warning(f"Could not fetch learnings, proceeding without: {e}")
 
-        learnings_section = (
-            f"\n\n    === HISTORICAL LEARNINGS ===\n    {learnings_markdown}\n"
-            "    (Use these learnings to avoid past mistakes and validate your reasoning)"
-            if learnings_markdown
-            else ""
-        )
-
-        reliable_events, unreliable_events = self._partition_events(events)
-
-        # --- Gather intelligence for reliable events ---
-        intelligence_section = ""
-        if reliable_events:
-            intelligence_map = gather_intelligence(reliable_events)
-            successful_reliable_events = []
-            sections = []
-            for event in reliable_events:
-                if event.event_name in intelligence_map:
-                    successful_reliable_events.append(event)
-                    sections.append(intelligence_map[event.event_name])
-                else:
-                    logger.info(f"Routing '{event.event_name}' to fallback due to lack of sourcing data.")
-                    unreliable_events.append(event)
-            
-            reliable_events = successful_reliable_events
-            intelligence_section = "\n".join(sections)
-
-        fallback_events = self._select_fallback_event(reliable_events, unreliable_events)
-
-        # --- AI Fallback pipeline ---
-        fallback_recommendations = []
-        if fallback_events:
-            logger.info(
-                f"Routing {len(fallback_events)} low-information events to Fallback AI."
-            )
-            filtered_fallbacks = self._filter_fallback_markets(fallback_events)
-            if filtered_fallbacks:
-                try:
-                    fallback_response = make_fallback_selections(
-                        events=filtered_fallbacks,
-                        budget=request.budget,
-                        min_profit=request.min_profit,
-                        wallet_service=self.wallet_service,
-                        bet_repo=self.bet_repo,
-                    )
-                    for rec in fallback_response.recommendations:
-                        if rec.stake > request.budget:
-                            logger.warning(f"Fallback AI stake {rec.stake} exceeded budget {request.budget}. Capping stake.")
-                            rec.stake = request.budget
-                            
-                        if self._is_valid_bet(rec.stake, rec.odds):
-                            fallback_recommendations.append(rec)
-                        else:
-                            potential_profit = rec.stake * (rec.odds - 1)
-                            logger.warning(
-                                f"Skipping Fallback AI rec — stake: {rec.stake}, "
-                                f"profit: {potential_profit:.3f} — {rec.pick.event_name}"
-                            )
-                except Exception as e:
-                    logger.error(f"Error analyzing fallback events: {e}")
-
-        logger.info(
-            f"Routing {len(reliable_events)} events to standard AI, "
-            f"yielded {len(fallback_recommendations)} fallback recommendations."
-        )
-
-        # --- AI pipeline for reliable events ---
-        ai_recommendations = []
+        all_recommendations = []
         overall_reasoning = ""
 
-        if reliable_events:
-            try:
-                response_data: BettingAgentResponse = make_bet_selections(
-                    events=reliable_events,
-                    intelligence_section=intelligence_section,
-                    budget=request.budget,
-                    min_profit=request.min_profit,
-                    risk_appetite=request.risk_appetite,
-                    wallet_service=self.wallet_service,
-                    bet_repo=self.bet_repo,
-                    learnings_section=learnings_section,
-                )
-                overall_reasoning = response_data.overall_reasoning
-                for rec in response_data.recommendations:
-                    if rec.stake > request.budget:
-                        logger.warning(f"Standard AI stake {rec.stake} exceeded budget {request.budget}. Capping stake.")
-                        rec.stake = request.budget
+        try:
+            response_data: BettingAgentResponse = make_bet_selections(
+                events=events,
+                budget=request.budget,
+                min_profit=request.min_profit,
+                risk_appetite=request.risk_appetite,
+                wallet_service=self.wallet_service,
+                bet_repo=self.bet_repo,
+                betfair_service=self.betfair_service,
+                learnings_section=learnings_section,
+            )
+            overall_reasoning = response_data.overall_reasoning
 
-                    if self._is_valid_bet(rec.stake, rec.odds):
-                        ai_recommendations.append(rec)
-                    else:
-                        potential_profit = rec.stake * (rec.odds - 1)
-                        logger.warning(
-                            f"Skipping AI rec — stake: {rec.stake}, "
-                            f"profit: {potential_profit:.3f} — {rec.pick.event_name}"
-                        )
-            except Exception as e:
-                logger.error(f"Error analyzing events: {e}")
-                overall_reasoning = f"Failed to analyze events — {str(e)}"
+            # --- Resolve pick names from source events by ID ---
+            # Build a flat lookup: (market_id, selection_id) → (event_name, market_name, option_name)
+            id_lookup: dict = {}
+            for event in events:
+                for market in event.options:
+                    for selection in market.options:
+                        key = (market.market_id, int(selection.selection_id))
+                        id_lookup[key] = (event.event_name, market.name, selection.name)
 
-        all_recommendations = ai_recommendations + fallback_recommendations
+            for rec in response_data.recommendations:
+                key = (rec.market_id, int(rec.selection_id))
+                resolved = id_lookup.get(key)
+                if resolved:
+                    rec.pick.event_name, rec.pick.market_name, rec.pick.option_name = resolved
+                else:
+                    logger.warning(
+                        f"Could not resolve names for market_id={rec.market_id}, "
+                        f"selection_id={rec.selection_id} — skipping recommendation."
+                    )
+                    continue
+
+                if rec.stake > request.budget:
+                    logger.warning(
+                        f"AI stake {rec.stake} exceeded budget {request.budget}. Capping stake."
+                    )
+                    rec.stake = request.budget
+
+                if self._is_valid_bet(rec.stake, rec.odds):
+                    all_recommendations.append(rec)
+                else:
+                    potential_profit = rec.stake * (rec.odds - 1)
+                    logger.warning(
+                        f"Skipping AI rec — stake: {rec.stake}, "
+                        f"profit: {potential_profit:.3f} — {rec.pick.event_name}"
+                    )
+
+        except Exception as e:
+            logger.error(f"Error during AI analysis: {e}")
+            overall_reasoning = f"Failed to analyze events — {str(e)}"
+
 
         # --- Budget enforcement ---
         total_stake = sum(rec.stake for rec in all_recommendations)
@@ -228,7 +128,7 @@ class BettingAnalysisService:
             )
             for rec in all_recommendations:
                 rec.stake = rec.stake * scale_factor
-            
+
             # Re-validate against min profit after scaling down
             valid_scaled_recs = []
             for rec in all_recommendations:
@@ -278,6 +178,7 @@ class BettingAnalysisService:
                 "side": rec.side,
                 "reasoning": rec.reasoning,
                 "stake_justification": getattr(rec, "stake_justification", None),
+                "source": "ai",
             })
 
         return {

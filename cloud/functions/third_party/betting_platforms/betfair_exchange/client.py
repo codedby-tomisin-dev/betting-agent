@@ -62,24 +62,53 @@ class BetfairExchange(BaseBettingPlatform):
             
         return options
 
-    def _fetch_markets_with_odds(self, market_catalogue: list) -> dict:
-        """Fetch market books for a list of catalogue entries (dicts or objects) and return a market_id → book mapping."""
-        # Handle both dicts (lightweight) and objects
+    def _fetch_markets_with_odds(self, market_catalogue: list, batch_size: int = 40) -> dict:
+        """Fetch market books in batches of `batch_size` to stay within Betfair's TOO_MUCH_DATA limit (max 40 per call)."""
         market_ids = [
-            (m.get('marketId') if isinstance(m, dict) else m.market_id) 
+            (m.get('marketId') if isinstance(m, dict) else m.market_id)
             for m in market_catalogue
         ]
-        
+
         if not market_ids:
             return {}
 
-        market_books = self.client.betting.list_market_book(
-            market_ids=market_ids,
-            price_projection=betfairlightweight.filters.price_projection(
-                price_data=['EX_BEST_OFFERS']
+        books_map = {}
+        for i in range(0, len(market_ids), batch_size):
+            chunk = market_ids[i:i + batch_size]
+            try:
+                market_books = self.client.betting.list_market_book(
+                    market_ids=chunk,
+                    price_projection=betfairlightweight.filters.price_projection(
+                        price_data=['EX_BEST_OFFERS']
+                    )
+                )
+                books_map.update({book.market_id: book for book in market_books})
+            except Exception as e:
+                logger.error(f"Error fetching market book batch {i}–{i + batch_size}: {e}")
+
+        return books_map
+
+    def get_market_liquidity(self, market_id: str, selection_id: int) -> float:
+        """Fetch the available liquidity (size) to back for a specific selection."""
+        try:
+            market_books = self.client.betting.list_market_book(
+                market_ids=[market_id],
+                price_projection=betfairlightweight.filters.price_projection(
+                    price_data=['EX_BEST_OFFERS']
+                )
             )
-        )
-        return {book.market_id: book for book in market_books}
+            if not market_books:
+                return 0.0
+                
+            book = market_books[0]
+            for runner in book.runners:
+                if runner.selection_id == selection_id:
+                    if runner.ex.available_to_back:
+                        return runner.ex.available_to_back[0].size
+            return 0.0
+        except Exception as e:
+            logger.error(f"Error fetching liquidity for market {market_id}, selection {selection_id}: {e}")
+            return 0.0
 
     def get_balance(self) -> Dict[str, Any]:
         """
@@ -163,28 +192,78 @@ class BetfairExchange(BaseBettingPlatform):
                 to=to_time
             )
 
-        try:
-            market_catalogue = self.client.betting.list_market_catalogue(
-                filter=betfairlightweight.filters.market_filter(
-                    text_query=text_query,
-                    event_type_ids=[event_type_id],
-                    competition_ids=competition_ids if competition_ids else None,
-                    market_type_codes=market_type_codes,
-                    market_start_time=market_start_time
-                ),
-                max_results=max_results,
-                market_projection=['EVENT', 'RUNNER_METADATA', 'MARKET_START_TIME', 'MARKET_DESCRIPTION', 'COMPETITION'],
-                sort='FIRST_TO_START', # Prioritize imminent games
-                lightweight=True
-            )
-            
-            logger.info(f"Retrieved {len(market_catalogue)} markets from Betfair")
-        except Exception as e:
-            logger.error(f"Error fetching market catalogue: {e}")
-            market_catalogue = None
+        # Betfair's list_market_catalogue hard-limits responses to ~100 results.
+        # Paginate by batching competition IDs to stay inside that limit.
+        CATALOGUE_BATCH_SIZE = 3  # competitions per call (keeps results well under 100)
+        CATALOGUE_MAX_PER_CALL = 100
 
-        if not market_catalogue:
-            return []
+        market_catalogue: list = []
+
+        def _fetch_catalogue_batch(comp_ids_batch):
+            try:
+                batch = self.client.betting.list_market_catalogue(
+                    filter=betfairlightweight.filters.market_filter(
+                        text_query=text_query,
+                        event_type_ids=[event_type_id],
+                        competition_ids=comp_ids_batch if comp_ids_batch else None,
+                        market_type_codes=market_type_codes,
+                        market_start_time=market_start_time
+                    ),
+                    max_results=CATALOGUE_MAX_PER_CALL,
+                    market_projection=['EVENT', 'RUNNER_METADATA', 'MARKET_START_TIME', 'MARKET_DESCRIPTION', 'COMPETITION'],
+                    sort='FIRST_TO_START',
+                    lightweight=True
+                )
+                return batch or []
+            except Exception as e:
+                logger.error(f"Error fetching market catalogue batch {comp_ids_batch}: {e}")
+                return []
+
+        if competition_ids:
+            for i in range(0, len(competition_ids), CATALOGUE_BATCH_SIZE):
+                batch_ids = competition_ids[i:i + CATALOGUE_BATCH_SIZE]
+                market_catalogue.extend(_fetch_catalogue_batch(batch_ids))
+                if len(market_catalogue) >= max_results:
+                    market_catalogue = market_catalogue[:max_results]
+                    break
+        else:
+            # Use event_ids pagination since listMarketCatalogue is capped at 1000
+            try:
+                all_events = self.client.betting.list_events(
+                    filter=betfairlightweight.filters.market_filter(
+                        text_query=text_query,
+                        event_type_ids=[event_type_id],
+                        market_start_time=market_start_time
+                    )
+                )
+                if all_events:
+                    event_ids = [e.event.id for e in all_events]
+                    logger.info(f"Retrieved {len(event_ids)} events. Fetching catalogues in batches of 20...")
+                    EVENT_BATCH_SIZE = 20
+                    for i in range(0, len(event_ids), EVENT_BATCH_SIZE):
+                        batch_event_ids = event_ids[i:i + EVENT_BATCH_SIZE]
+                        batch_markets = self.client.betting.list_market_catalogue(
+                            filter=betfairlightweight.filters.market_filter(
+                                text_query=text_query,
+                                event_type_ids=[event_type_id],
+                                event_ids=batch_event_ids,
+                                market_type_codes=market_type_codes,
+                                market_start_time=market_start_time
+                            ),
+                            max_results=CATALOGUE_MAX_PER_CALL,
+                            market_projection=['EVENT', 'RUNNER_METADATA', 'MARKET_START_TIME', 'MARKET_DESCRIPTION', 'COMPETITION'],
+                            sort='FIRST_TO_START',
+                            lightweight=True
+                        )
+                        if batch_markets:
+                            market_catalogue.extend(batch_markets)
+                        if len(market_catalogue) >= max_results:
+                            market_catalogue = market_catalogue[:max_results]
+                            break
+            except Exception as e:
+                logger.error(f"Error fetching all events for pagination: {e}")
+
+        logger.info(f"Retrieved {len(market_catalogue)} markets from Betfair")
 
         books_map = self._fetch_markets_with_odds(market_catalogue)
 
@@ -196,7 +275,7 @@ class BetfairExchange(BaseBettingPlatform):
                 continue
 
             # Check market liquidity to avoid matches without popular demand
-            min_liquidity = AUTOMATED_BETTING_OPTIONS.get("MIN_MATCHED_LIQUIDITY", 500)
+            min_liquidity = AUTOMATED_BETTING_OPTIONS.get("MIN_MATCHED_LIQUIDITY", 100)
             if (book.total_matched or 0) < min_liquidity:
                 logger.info(f"Skipping market {market_id} due to low liquidity ({book.total_matched} < {min_liquidity})")
                 continue

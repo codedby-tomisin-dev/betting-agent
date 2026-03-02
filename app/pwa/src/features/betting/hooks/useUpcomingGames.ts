@@ -1,67 +1,63 @@
 import { useState, useEffect } from "react";
-import { fetchUpcomingGames } from "@/shared/api/bettingApi";
-import { BetEvent } from "@/shared/types";
+import { subscribeDailyFixtures } from "@/shared/api/bettingApi";
+import { DailyFixture } from "@/shared/types";
+
+function utcDateStr(offset = 0): string {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() + offset);
+    return d.toISOString().split('T')[0];
+}
 
 export function useUpcomingGames(date?: string) {
-    const [games, setGames] = useState<BetEvent[]>([]);
+    const [fixtures, setFixtures] = useState<DailyFixture[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [actualDate, setActualDate] = useState<string | undefined>(date);
 
     useEffect(() => {
-        let isMounted = true;
+        setIsLoading(true);
+        setError(null);
 
-        const loadGames = async () => {
-            try {
-                setIsLoading(true);
+        // Try today first; fall back to tomorrow if today has no fixtures.
+        // The scheduler stores games at midnight UTC under the next day's date,
+        // so late-night users would otherwise see an empty grid.
+        const todayStr = date ?? utcDateStr(0);
+        const tomorrowStr = date ?? utcDateStr(1);
 
-                // Start with provided date or today
-                const baseDate = date ? new Date(date) : new Date();
-                let currentDate = baseDate.toISOString().split('T')[0];
+        let unsubscribeCurrent: (() => void) | null = null;
+        let switched = false;
 
-                // Try to fetch games for the current date
-                let data = await fetchUpcomingGames(currentDate);
-                let daysChecked = 0;
-                const maxDaysToCheck = 7;
-
-                // If no games found, try next days
-                while (data.length === 0 && daysChecked < maxDaysToCheck && isMounted) {
-                    daysChecked++;
-
-                    // Calculate next date
-                    const nextDate = new Date(baseDate);
-                    nextDate.setDate(nextDate.getDate() + daysChecked);
-                    currentDate = nextDate.toISOString().split('T')[0];
-
-                    console.log(`No games found, trying ${currentDate}...`);
-                    data = await fetchUpcomingGames(currentDate);
-                }
-
-                if (isMounted) {
-                    setGames(data);
-                    setActualDate(currentDate);
-                    if (data.length === 0) {
-                        setError(`No upcoming games found in the next ${maxDaysToCheck} days`);
+        const subscribeDate = (dateStr: string) => {
+            setActualDate(dateStr);
+            return subscribeDailyFixtures(
+                dateStr,
+                (newFixtures) => {
+                    if (newFixtures.length === 0 && !switched && dateStr === todayStr && todayStr !== tomorrowStr) {
+                        // Today is empty — check tomorrow
+                        switched = true;
+                        if (unsubscribeCurrent) unsubscribeCurrent();
+                        unsubscribeCurrent = subscribeDate(tomorrowStr);
+                    } else {
+                        setFixtures(newFixtures);
+                        setIsLoading(false);
                     }
-                }
-            } catch (err) {
-                if (isMounted) {
-                    setError(err instanceof Error ? err.message : "Failed to load upcoming games");
-                    setGames([]);
-                }
-            } finally {
-                if (isMounted) {
+                },
+                (err) => {
+                    setError(err.message || "Failed to subscribe to daily fixtures");
                     setIsLoading(false);
+                    setFixtures([]);
                 }
-            }
+            );
         };
 
-        loadGames();
+        unsubscribeCurrent = subscribeDate(todayStr);
 
         return () => {
-            isMounted = false;
+            if (unsubscribeCurrent) unsubscribeCurrent();
         };
     }, [date]);
 
-    return { games, isLoading, error, actualDate };
+    const games = fixtures.map(f => f.event);
+
+    return { fixtures, games, isLoading, error, actualDate };
 }
