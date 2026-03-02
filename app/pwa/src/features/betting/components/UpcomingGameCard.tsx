@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Calendar, Star, Loader2, Sparkles } from "lucide-react";
+import { Calendar, Star, Sparkles } from "lucide-react";
 import { DailyFixture, BetEvent, MarketOption, SelectionOption, BetSelectionItem } from "@/shared/types";
 import { format } from "date-fns";
 
@@ -134,7 +134,7 @@ export function UpcomingGameCard({
                                     fixture.selections.map((sel, idx) => (
                                         <div key={`${sel.market_id ?? idx}-${sel.selection_id ?? idx}`} className="flex justify-between items-center gap-2">
                                             <div className="flex items-center gap-1 overflow-hidden">
-                                                {(sel as any).source === 'ai' && <Sparkles className="h-2.5 w-2.5 text-violet-500 shrink-0" />}
+                                                {sel.source === 'ai' && <Sparkles className="h-2.5 w-2.5 text-violet-500 shrink-0" />}
                                                 <span className="text-xs text-gray-700 font-medium truncate">
                                                     {sel.market || "Selection"}
                                                 </span>

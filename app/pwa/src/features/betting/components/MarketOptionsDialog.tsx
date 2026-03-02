@@ -72,7 +72,8 @@ export function MarketOptionsDialog({
             hasFetchedMarkets.current = true;
             setAllMarkets(event.options || []);
         }
-    }, [isOpen, event.provider_event_id]); // Removed event.options to prevent full refresh on selection toggle
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- event.options is intentionally excluded: it changes on every selection toggle which would re-trigger a full market fetch
+    }, [isOpen, event.provider_event_id]);
 
     // Reset analysis when dialog opens/closes
     useEffect(() => {
